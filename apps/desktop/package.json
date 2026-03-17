@@ -1,0 +1,28 @@
+{
+  "name": "@lumina/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@lumina/protocol": "0.1.0",
+    "pixi.js": "^8.17.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.6.2",
+    "electron": "^41.0.2",
+    "electron-vite": "^5.0.0",
+    "vite": "^7.3.1",
+    "typescript": "^5.6.3"
+  }
+}
