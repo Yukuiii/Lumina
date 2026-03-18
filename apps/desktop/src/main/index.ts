@@ -7,6 +7,8 @@ const LOCAL_ASSET_SCHEME = "lumina-model";
 const MODEL_SCOPE = "model";
 const RUNTIME_SCOPE = "runtime";
 const WINDOW_DRAG_CHANNEL = "lumina:window-drag";
+const MAIN_WINDOW_WIDTH = 420;
+const MAIN_WINDOW_HEIGHT = 680;
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -121,16 +123,22 @@ function registerWindowDragEvents(): void {
 }
 
 /**
- * 创建桌宠主窗口（透明、无边框、非置顶）。
+ * 创建桌宠主窗口（透明、无边框、非置顶、固定尺寸）。
  */
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 420,
-    height: 680,
+    width: MAIN_WINDOW_WIDTH,
+    height: MAIN_WINDOW_HEIGHT,
+    minWidth: MAIN_WINDOW_WIDTH,
+    minHeight: MAIN_WINDOW_HEIGHT,
+    maxWidth: MAIN_WINDOW_WIDTH,
+    maxHeight: MAIN_WINDOW_HEIGHT,
     transparent: true,
     backgroundColor: "#00000000",
     frame: false,
-    resizable: true,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
     movable: true,
     webPreferences: {
       preload: path.join(__dirname, "../preload/index.js"),
