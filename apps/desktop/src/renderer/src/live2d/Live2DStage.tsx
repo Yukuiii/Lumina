@@ -5,6 +5,7 @@ import type { Live2DModel as Live2DModelType } from "@jannchie/pixi-live2d-displ
 const MODEL_ENTRY_PATH = "AzueLane/aierdeliqi_5/aierdeliqi_5.model3.json";
 const MODEL_SCALE_BOOST = 1.06;
 const MODEL_BOUNDS_TRIM_RATIO = 0.01;
+const MODEL_CENTER_OFFSET_X = -14;
 
 type Live2DWindow = Window & {
   PIXI?: typeof PIXI;
@@ -151,8 +152,8 @@ function fitModelToStage(model: Live2DModelType, host: HTMLElement): void {
   const scale = fitScale * MODEL_SCALE_BOOST;
 
   model.scale.set(scale);
-  model.x = stageWidth / 2 - (drawableBounds.x + drawableBounds.width / 2) * scale;
-  model.y = stageHeight - 12 - (drawableBounds.y + drawableBounds.height) * scale;
+  model.x = stageWidth / 2 - (drawableBounds.x + drawableBounds.width / 2) * scale + MODEL_CENTER_OFFSET_X;
+  model.y = stageHeight / 2 - (drawableBounds.y + drawableBounds.height / 2) * scale;
 }
 
 /**
