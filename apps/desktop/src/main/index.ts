@@ -7,8 +7,8 @@ const LOCAL_ASSET_SCHEME = "lumina-model";
 const MODEL_SCOPE = "model";
 const RUNTIME_SCOPE = "runtime";
 const WINDOW_DRAG_CHANNEL = "lumina:window-drag";
-const MAIN_WINDOW_WIDTH = 420;
-const MAIN_WINDOW_HEIGHT = 680;
+const MAIN_WINDOW_WIDTH = 500;
+const MAIN_WINDOW_HEIGHT = 500;
 
 protocol.registerSchemesAsPrivileged([
   {
