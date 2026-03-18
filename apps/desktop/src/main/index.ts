@@ -1,5 +1,99 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow } from "electron";
+import { pathToFileURL } from "node:url";
+import { app, BrowserWindow, net, protocol } from "electron";
+
+const LOCAL_ASSET_SCHEME = "lumina-model";
+const MODEL_SCOPE = "model";
+const RUNTIME_SCOPE = "runtime";
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: LOCAL_ASSET_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true
+    }
+  }
+]);
+
+/**
+ * 解析模型目录根路径，优先命中当前仓库根目录。
+ */
+function resolveModelsRoot(): string {
+  const candidates = [
+    path.resolve(process.cwd(), "models"),
+    path.resolve(app.getAppPath(), "../../models"),
+    path.resolve(app.getAppPath(), "models")
+  ];
+
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
+}
+
+/**
+ * 解析 Live2D 运行时文件目录。
+ */
+function resolveRuntimeRoot(): string {
+  const candidates = [
+    path.resolve(process.cwd(), "vendors/live2d"),
+    path.resolve(app.getAppPath(), "../../vendors/live2d"),
+    path.resolve(app.getAppPath(), "vendors/live2d")
+  ];
+
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
+}
+
+/**
+ * 将自定义协议 URL 映射为仓库内的安全本地文件路径。
+ */
+function resolveLocalAssetPath(requestUrl: string): string | null {
+  const url = new URL(requestUrl);
+  const normalizedPath = path.posix.join(url.hostname, decodeURIComponent(url.pathname).replace(/^\/+/, ""));
+
+  let baseRoot: string;
+  let relativePath: string;
+
+  if (normalizedPath === MODEL_SCOPE || normalizedPath.startsWith(`${MODEL_SCOPE}/`)) {
+    baseRoot = resolveModelsRoot();
+    relativePath = normalizedPath.slice(MODEL_SCOPE.length).replace(/^\/+/, "");
+  } else if (normalizedPath === RUNTIME_SCOPE || normalizedPath.startsWith(`${RUNTIME_SCOPE}/`)) {
+    baseRoot = resolveRuntimeRoot();
+    relativePath = normalizedPath.slice(RUNTIME_SCOPE.length).replace(/^\/+/, "");
+  } else {
+    return null;
+  }
+
+  const safeSegments = relativePath.split("/").filter(Boolean);
+  const assetPath = path.resolve(baseRoot, ...safeSegments);
+  const relativeToRoot = path.relative(baseRoot, assetPath);
+
+  if (relativeToRoot.startsWith("..") || path.isAbsolute(relativeToRoot)) {
+    return null;
+  }
+
+  return assetPath;
+}
+
+/**
+ * 注册本地只读资源协议，供渲染进程安全读取模型与 Cubism Core。
+ */
+function registerLocalAssetProtocol(): void {
+  if (protocol.isProtocolHandled(LOCAL_ASSET_SCHEME)) {
+    protocol.unhandle(LOCAL_ASSET_SCHEME);
+  }
+
+  protocol.handle(LOCAL_ASSET_SCHEME, async (request) => {
+    const assetPath = resolveLocalAssetPath(request.url);
+
+    if (!assetPath || !existsSync(assetPath)) {
+      return new Response("Not Found", { status: 404 });
+    }
+
+    return net.fetch(pathToFileURL(assetPath).toString());
+  });
+}
 
 /**
  * 创建桌宠主窗口（透明、无边框、可置顶）。
@@ -30,6 +124,7 @@ function createMainWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
+  registerLocalAssetProtocol();
   createMainWindow();
 
   app.on("activate", () => {

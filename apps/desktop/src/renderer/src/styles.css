@@ -26,6 +26,11 @@ body {
   backdrop-filter: blur(10px);
 }
 
+.panel-stage {
+  min-height: 0;
+  padding: 8px;
+}
+
 .row {
   display: flex;
   gap: 8px;
@@ -56,8 +61,53 @@ button {
   line-height: 1.4;
 }
 
+.log-compact {
+  height: 96px;
+  margin-top: 10px;
+}
+
 .status {
   font-size: 12px;
   opacity: 0.9;
 }
 
+.stage-shell {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 40%),
+    linear-gradient(180deg, rgba(16, 23, 37, 0.88), rgba(7, 11, 18, 0.92));
+}
+
+.stage-canvas {
+  height: 100%;
+}
+
+.stage-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.stage-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(6, 10, 16, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.stage-overlay.is-error {
+  background: rgba(107, 18, 32, 0.82);
+  border-color: rgba(255, 145, 145, 0.24);
+}

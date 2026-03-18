@@ -1,5 +1,9 @@
-import React, { useMemo, useRef, useState } from "react";
-import { createEnvelope, WS_EVENT_TYPE, type WsEnvelope } from "@lumina/protocol";
+import React, { useEffectEvent, useMemo, useRef, useState } from "react";
+import * as protocol from "@lumina/protocol";
+import type { WsEnvelope } from "@lumina/protocol";
+import { Live2DStage } from "../live2d/Live2DStage";
+
+const { createEnvelope, WS_EVENT_TYPE } = protocol;
 
 type ConnectionState = "disconnected" | "connecting" | "connected";
 
@@ -19,9 +23,9 @@ export function App(): React.JSX.Element {
   /**
    * 追加一行日志（用于联调可视化）。
    */
-  const appendLog = (line: string): void => {
+  const appendLog = useEffectEvent((line: string): void => {
     setLog((prev) => (prev ? `${prev}\n${line}` : line));
-  };
+  });
 
   /**
    * 连接到 Gateway WebSocket。
@@ -167,11 +171,8 @@ export function App(): React.JSX.Element {
         </div>
       </div>
 
-      <div className="panel">
-        <div className="status" style={{ marginBottom: 6 }}>
-          这里将放 Live2D 舞台（MVP 先打通 WS 流式链路）
-        </div>
-        <div className="log">{log || "（暂无日志）"}</div>
+      <div className="panel panel-stage">
+        <Live2DStage onLog={appendLog} />
       </div>
 
       <div className="panel">
@@ -188,8 +189,8 @@ export function App(): React.JSX.Element {
           <button onClick={sendTextUser}>发送</button>
           <button onClick={interrupt}>打断</button>
         </div>
+        <div className="log log-compact">{log || "（暂无日志）"}</div>
       </div>
     </div>
   );
 }
-

@@ -8,7 +8,12 @@ declare global {
     lumina: {
       /** 获取 Electron/Chrome/Node 的版本信息。 */
       getVersions(): { electron: string; chrome: string; node: string };
+      /** 获取指定 Live2D 模型文件的本地可读 URL。 */
+      getLive2DModelUrl(relativePath: string): string;
+      /** 获取 Cubism Core 运行时脚本的本地可读 URL。 */
+      getLive2DCoreScriptUrl(): string;
     };
+    Live2DCubismCore?: unknown;
   }
 }
 

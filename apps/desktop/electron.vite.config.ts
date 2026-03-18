@@ -12,9 +12,9 @@ export default defineConfig({
     plugins: [react()],
     resolve: {
       alias: {
-        "@renderer": path.join(__dirname, "src/renderer/src")
+        "@renderer": path.join(__dirname, "src/renderer/src"),
+        "@lumina/protocol": path.resolve(__dirname, "../../packages/protocol/src/index.ts")
       }
     }
   }
 });
-
