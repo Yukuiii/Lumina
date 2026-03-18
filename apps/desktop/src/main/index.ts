@@ -1,11 +1,12 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { app, BrowserWindow, net, protocol } from "electron";
+import { app, BrowserWindow, ipcMain, net, protocol } from "electron";
 
 const LOCAL_ASSET_SCHEME = "lumina-model";
 const MODEL_SCOPE = "model";
 const RUNTIME_SCOPE = "runtime";
+const WINDOW_DRAG_CHANNEL = "lumina:window-drag";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -96,16 +97,41 @@ function registerLocalAssetProtocol(): void {
 }
 
 /**
- * 创建桌宠主窗口（透明、无边框、可置顶）。
+ * 注册桌宠窗口拖动事件，供渲染进程按鼠标位移移动窗口。
+ */
+function registerWindowDragEvents(): void {
+  ipcMain.removeAllListeners(WINDOW_DRAG_CHANNEL);
+  ipcMain.on(WINDOW_DRAG_CHANNEL, (event, payload: unknown) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+
+    if (!win) {
+      return;
+    }
+
+    const deltaX = typeof (payload as { deltaX?: unknown })?.deltaX === "number" ? (payload as { deltaX: number }).deltaX : 0;
+    const deltaY = typeof (payload as { deltaY?: unknown })?.deltaY === "number" ? (payload as { deltaY: number }).deltaY : 0;
+
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) {
+      return;
+    }
+
+    const [currentX, currentY] = win.getPosition();
+    win.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY));
+  });
+}
+
+/**
+ * 创建桌宠主窗口（透明、无边框、非置顶）。
  */
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 420,
     height: 680,
     transparent: true,
+    backgroundColor: "#00000000",
     frame: false,
     resizable: true,
-    alwaysOnTop: true,
+    movable: true,
     webPreferences: {
       preload: path.join(__dirname, "../preload/index.js"),
       sandbox: true,
@@ -125,6 +151,7 @@ function createMainWindow(): BrowserWindow {
 
 app.whenReady().then(() => {
   registerLocalAssetProtocol();
+  registerWindowDragEvents();
   createMainWindow();
 
   app.on("activate", () => {

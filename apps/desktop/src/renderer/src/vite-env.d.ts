@@ -12,10 +12,11 @@ declare global {
       getLive2DModelUrl(relativePath: string): string;
       /** 获取 Cubism Core 运行时脚本的本地可读 URL。 */
       getLive2DCoreScriptUrl(): string;
+      /** 根据指针移动量拖动当前桌宠窗口。 */
+      dragWindowBy(deltaX: number, deltaY: number): void;
     };
     Live2DCubismCore?: unknown;
   }
 }
 
 export {};
-

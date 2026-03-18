@@ -1,6 +1,7 @@
-import { contextBridge } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 
 const LOCAL_ASSET_SCHEME = "lumina-model";
+const WINDOW_DRAG_CHANNEL = "lumina:window-drag";
 
 /**
  * 构造渲染进程可访问的本地资源 URL。
@@ -42,5 +43,16 @@ contextBridge.exposeInMainWorld("lumina", {
    */
   getLive2DCoreScriptUrl(): string {
     return createAssetUrl("runtime", "live2dcubismcore.min.js");
+  },
+
+  /**
+   * 根据指针移动量拖动当前桌宠窗口。
+   */
+  dragWindowBy(deltaX: number, deltaY: number): void {
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) {
+      return;
+    }
+
+    ipcRenderer.send(WINDOW_DRAG_CHANNEL, { deltaX, deltaY });
   }
 });

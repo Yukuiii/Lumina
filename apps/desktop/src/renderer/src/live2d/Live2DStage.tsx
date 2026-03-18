@@ -3,11 +3,8 @@ import * as PIXI from "pixi.js";
 import type { Live2DModel as Live2DModelType } from "@jannchie/pixi-live2d-display/cubism4";
 
 const MODEL_ENTRY_PATH = "AzueLane/aierdeliqi_5/aierdeliqi_5.model3.json";
-const MODEL_SCALE_BOOST = 1.15;
-
-type Live2DStageProps = {
-  onLog?: (line: string) => void;
-};
+const MODEL_SCALE_BOOST = 1.06;
+const MODEL_BOUNDS_TRIM_RATIO = 0.01;
 
 type Live2DWindow = Window & {
   PIXI?: typeof PIXI;
@@ -19,9 +16,13 @@ type RendererWithGl = PIXI.Renderer & {
   gl?: WebGLRenderingContext | WebGL2RenderingContext;
 };
 
-type StageStatus = {
-  isError: boolean;
-  text: string;
+type DragState = {
+  pointerId: number;
+  startScreenX: number;
+  startScreenY: number;
+  lastScreenX: number;
+  lastScreenY: number;
+  hasMoved: boolean;
 };
 
 let cubismCoreLoader: Promise<void> | null = null;
@@ -139,19 +140,19 @@ function getDrawableBounds(
 function fitModelToStage(model: Live2DModelType, host: HTMLElement): void {
   const stageWidth = host.clientWidth;
   const stageHeight = host.clientHeight;
-  const drawableBounds = getDrawableBounds(model, 0.02) ?? getDrawableBounds(model);
+  const drawableBounds = getDrawableBounds(model, MODEL_BOUNDS_TRIM_RATIO) ?? getDrawableBounds(model);
 
   if (!stageWidth || !stageHeight || !drawableBounds || !drawableBounds.width || !drawableBounds.height) {
     return;
   }
 
-  const fitScale = Math.min((stageWidth * 0.9) / drawableBounds.width, (stageHeight * 0.96) / drawableBounds.height);
+  const fitScale = Math.min((stageWidth * 0.84) / drawableBounds.width, (stageHeight * 0.92) / drawableBounds.height);
   // 让模型尽量占满舞台主体区域，同时保留少量安全边距避免被裁切。
   const scale = fitScale * MODEL_SCALE_BOOST;
 
   model.scale.set(scale);
   model.x = stageWidth / 2 - (drawableBounds.x + drawableBounds.width / 2) * scale;
-  model.y = stageHeight - 4 - (drawableBounds.y + drawableBounds.height) * scale;
+  model.y = stageHeight - 12 - (drawableBounds.y + drawableBounds.height) * scale;
 }
 
 /**
@@ -183,25 +184,86 @@ function toTapMotionGroup(hitAreaName: string): string {
 /**
  * Live2D 舞台组件，负责初始化 Pixi 舞台并加载本地模型。
  */
-export function Live2DStage({ onLog }: Live2DStageProps): React.JSX.Element {
+export function Live2DStage(): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const [status, setStatus] = useState<StageStatus>({
-    isError: false,
-    text: "准备加载模型"
+  const dragStateRef = useRef<DragState | null>(null);
+  const suppressHitUntilRef = useRef<number>(0);
+  const [errorText, setErrorText] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  /**
+   * 开始记录窗口拖动所需的指针状态。
+   */
+  const handlePointerDown = useEffectEvent((event: React.PointerEvent<HTMLDivElement>): void => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startScreenX: event.screenX,
+      startScreenY: event.screenY,
+      lastScreenX: event.screenX,
+      lastScreenY: event.screenY,
+      hasMoved: false
+    };
   });
 
   /**
-   * 记录舞台内部日志。
+   * 根据指针位移拖动当前桌宠窗口，并在达到阈值后屏蔽误触发的点击动作。
    */
-  const log = useEffectEvent((line: string): void => {
-    onLog?.(line);
+  const handlePointerMove = useEffectEvent((event: React.PointerEvent<HTMLDivElement>): void => {
+    const dragState = dragStateRef.current;
+
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const totalDeltaX = event.screenX - dragState.startScreenX;
+    const totalDeltaY = event.screenY - dragState.startScreenY;
+    const stepDeltaX = event.screenX - dragState.lastScreenX;
+    const stepDeltaY = event.screenY - dragState.lastScreenY;
+
+    if (!dragState.hasMoved) {
+      // 只有明显移动后才进入拖动状态，避免普通点击也把窗口拽走。
+      if (Math.hypot(totalDeltaX, totalDeltaY) < 6) {
+        return;
+      }
+
+      event.currentTarget.setPointerCapture(event.pointerId);
+      dragState.hasMoved = true;
+      setIsDragging(true);
+    }
+
+    if (!stepDeltaX && !stepDeltaY) {
+      return;
+    }
+
+    dragState.lastScreenX = event.screenX;
+    dragState.lastScreenY = event.screenY;
+    window.lumina.dragWindowBy(stepDeltaX, stepDeltaY);
   });
 
   /**
-   * 更新舞台顶部状态提示。
+   * 结束窗口拖动，并短暂屏蔽拖动后的模型点击命中。
    */
-  const updateStatus = useEffectEvent((text: string, isError = false): void => {
-    setStatus({ text, isError });
+  const handlePointerRelease = useEffectEvent((event: React.PointerEvent<HTMLDivElement>): void => {
+    const dragState = dragStateRef.current;
+
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (dragState.hasMoved) {
+      suppressHitUntilRef.current = Date.now() + 180;
+    }
+
+    dragStateRef.current = null;
+    setIsDragging(false);
   });
 
   useEffect(() => {
@@ -216,14 +278,12 @@ export function Live2DStage({ onLog }: Live2DStageProps): React.JSX.Element {
     let pixiApp: PIXI.Application | null = null;
 
     void (async () => {
-      updateStatus("加载 Cubism Core");
       await ensureCubismCoreLoaded(window.lumina.getLive2DCoreScriptUrl());
 
       if (disposed) {
         return;
       }
 
-      updateStatus("初始化 Pixi 舞台");
       const live2dWindow = window as Live2DWindow;
       live2dWindow.PIXI = PIXI;
       const { Live2DModel } = await import("@jannchie/pixi-live2d-display/cubism4");
@@ -248,13 +308,8 @@ export function Live2DStage({ onLog }: Live2DStageProps): React.JSX.Element {
 
       pixiApp = app;
       host.replaceChildren(app.canvas);
-      log(`[live2d] renderer: ${app.renderer.constructor.name}`);
       const rendererWithGl = app.renderer as RendererWithGl;
-      log(
-        `[live2d] gl: ${rendererWithGl.gl?.constructor?.name ?? "unknown"}, screen=${app.renderer.screen.width}x${app.renderer.screen.height}`
-      );
 
-      updateStatus("加载 Live2D 模型");
       const model = await Live2DModel.from(window.lumina.getLive2DModelUrl(MODEL_ENTRY_PATH), {
         autoUpdate: true,
         autoHitTest: true,
@@ -271,7 +326,7 @@ export function Live2DStage({ onLog }: Live2DStageProps): React.JSX.Element {
       const unsafeModel = model as any;
       unsafeModel.renderer = rendererWithGl;
       model.eventMode = "static";
-      model.cursor = "pointer";
+      model.cursor = "grab";
       app.stage.addChild(model);
       app.render();
       fitModelWhenReady(model, host);
@@ -280,13 +335,16 @@ export function Live2DStage({ onLog }: Live2DStageProps): React.JSX.Element {
       void model.motion("Idle");
 
       model.on("hit", (hitAreas: string[]) => {
+        if (Date.now() < suppressHitUntilRef.current) {
+          return;
+        }
+
         const hitAreaName = hitAreas[0];
 
         if (!hitAreaName) {
           return;
         }
 
-        log(`[live2d] hit: ${hitAreas.join(", ")}`);
         void model.motion(toTapMotionGroup(hitAreaName));
       });
 
@@ -294,29 +352,9 @@ export function Live2DStage({ onLog }: Live2DStageProps): React.JSX.Element {
         fitModelToStage(model, host);
       });
       resizeObserver.observe(host);
-
-      updateStatus("模型已就绪");
-      const bounds = model.getLocalBounds();
-      const rawDrawableBounds = getDrawableBounds(model);
-      const stageDrawableBounds = getDrawableBounds(model, 0.02) ?? rawDrawableBounds;
-      const textureSummary = model.textures
-        .map(
-          (texture, index) =>
-            `${index}:${texture.width}x${texture.height}:source=${texture.source.width}x${texture.source.height}`
-        )
-        .join(", ");
-      log(
-        `[live2d] size: internal=${model.internalModel?.width ?? 0}x${model.internalModel?.height ?? 0}, bounds=${bounds.width.toFixed(2)}x${bounds.height.toFixed(2)}, rawDrawable=${rawDrawableBounds?.width.toFixed(2) ?? 0}x${rawDrawableBounds?.height.toFixed(2) ?? 0}, stageDrawable=${stageDrawableBounds?.width.toFixed(2) ?? 0}x${stageDrawableBounds?.height.toFixed(2) ?? 0}`
-      );
-      log(
-        `[live2d] state: canRender=${String(model.canRender())}, validRenderer=${String(model.hasValidRenderer())}, visible=${String(model.visible)}, alpha=${model.alpha.toFixed(2)}`
-      );
-      log(`[live2d] textures: ${textureSummary}`);
-      log(`[live2d] model ready: ${MODEL_ENTRY_PATH}`);
     })().catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
-      updateStatus(`加载失败：${message}`, true);
-      log(`[live2d] load failed: ${message}`);
+      setErrorText(`加载失败：${message}`);
     });
 
     return () => {
@@ -328,9 +366,15 @@ export function Live2DStage({ onLog }: Live2DStageProps): React.JSX.Element {
   }, []);
 
   return (
-    <div className="stage-shell">
+    <div
+      className={`stage-shell${isDragging ? " is-dragging" : ""}`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerRelease}
+      onPointerCancel={handlePointerRelease}
+    >
       <div ref={hostRef} className="stage-canvas" />
-      <div className={`stage-overlay${status.isError ? " is-error" : ""}`}>{status.text}</div>
+      {errorText ? <div className="stage-overlay is-error">{errorText}</div> : null}
     </div>
   );
 }
