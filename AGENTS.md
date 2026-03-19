@@ -48,9 +48,13 @@
 ### Renderer 边界
 
 - `apps/desktop/src/renderer/src/main.tsx` 是渲染入口
-- `apps/desktop/src/renderer/src/ui/App.tsx` 当前保持很薄，只挂载 `Live2DStage`
-- `apps/desktop/src/renderer/src/live2d/Live2DStage.tsx` 承担 Pixi/Live2D 集成、模型加载、交互与 imperative 运行时逻辑
-- 当前没有全局状态管理库、通用组件库、design system、hooks 目录或测试基础设施
+- `apps/desktop/src/renderer/src/ui/App.tsx` 当前保持很薄，负责解析当前 `modelId` 来源：`?model=...` -> `VITE_LIVE2D_MODEL_ID` -> 默认 profile，然后把结果传给 `Live2DStage`
+- `apps/desktop/src/renderer/src/live2d/Live2DStage.tsx` 现在是 React 组装层：解析 profile、创建/销毁 session、挂接 interaction controller、挂接窗口拖动 hook，并只渲染宿主容器与错误态
+- `apps/desktop/src/renderer/src/live2d/engine/live2dSession.ts` 负责 Pixi / Cubism 运行时资源：Application 创建销毁、模型挂载、placement、hit/motion 订阅、StrictMode 下的 abort 与 WebGL 资源回收
+- `apps/desktop/src/renderer/src/live2d/engine/interactionController.ts` 负责点击命中后的交互编排：输入锁、hold timer、回 Idle、动作失败报错
+- `apps/desktop/src/renderer/src/live2d/config/modelProfiles.ts` 与 `apps/desktop/src/renderer/src/live2d/config/profiles/*` 是多模型注册表与模型专属动作配置入口；新增模型或调整模型行为，优先改这里，不要回退到 `Live2DStage` 里写硬编码分支
+- `apps/desktop/src/renderer/src/live2d/hooks/useDesktopPetDrag.ts` 负责桌宠窗口拖动与命中抑制时序；`apps/desktop/src/renderer/src/live2d/types.ts` 负责 profile / session / controller 的最小契约
+- 当前没有全局状态管理库、通用组件库或 design system；已经存在局部 `live2d/hooks` 目录，但不要据此扩张成新的全局 hooks 架构
 - 当前样式主要在 `apps/desktop/src/renderer/src/styles.css`
 
 ### Gateway / Protocol 边界
@@ -61,8 +65,9 @@
 
 ### 文档现实
 
-- 当前仓库没有可用的 `docs/` 目录，不要假设 `docs/ARCHITECTURE.md`、`docs/PROTOCOL_WS_V0.md` 等文件存在
-- 优先以代码、`package.json`、`README.md` 和工作区内实际实现为事实来源
+- 本地可能存在 `docs/` 下的设计草稿或重构计划文档；这些文件可能是忽略文件、未提交文件或阶段性草稿，不应默认视为稳定事实源
+- 如果用户明确要求产出设计文档，这类文档默认应保持本地忽略状态，不要把它们当成必须提交到仓库的正式文档
+- 架构与运行时事实优先以代码、`package.json`、`README.md` 和工作区内实际实现为准；引用 `docs/` 前先确认它是否真的是当前任务需要依赖的来源
 
 ## 前端优先的实现原则
 
@@ -89,6 +94,14 @@
 - Live2D / Pixi / canvas / imperative 桥接逻辑优先留在 `src/renderer/src/live2d`
 - 新增 `hooks`、`lib`、`features` 目录必须有明确收益；没有收益时沿用现有结构
 - 保持 `App` 或页面级容器轻量，避免把所有状态和副作用都塞进顶层组件
+
+当前 Live2D 分层应保持：
+
+- React 组装与错误态展示放在 `Live2DStage.tsx`
+- Pixi / Cubism session 生命周期与资源回收放在 `engine/live2dSession.ts`
+- 点击命中、动作调度、输入锁与 Idle 回退放在 `engine/interactionController.ts` 与 `engine/interactionResolver.ts`
+- 模型差异化配置、默认动作策略与新增模型注册放在 `config/modelProfiles.ts` 和 `config/profiles/*`
+- 模型切换入口保持在 `App.tsx` 或更上层，`Live2DStage` 只接收明确的 `modelId`
 
 ### 状态与副作用
 
