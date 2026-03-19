@@ -34,8 +34,8 @@ type WebSocketTransportOptions = {
 export type WebSocketTransportState = {
   /** 当前连接状态。 */
   status: TransportStatus;
-  /** 通过当前连接发送原始字符串。仅 `connected` 时有效。 */
-  send: (data: string) => void;
+  /** 通过当前连接发送原始字符串。仅 `connected` 时有效，返回是否发送成功。 */
+  send: (data: string) => boolean;
   /** 重连耗尽后的显式重试入口。 */
   retry: () => void;
 };
@@ -141,14 +141,15 @@ export function useWebSocketTransport(options: WebSocketTransportOptions): WebSo
   /**
    * 通过当前连接发送原始字符串。仅 `connected` 时有效。
    */
-  const send = useCallback((data: string) => {
+  const send = useCallback((data: string): boolean => {
     const ws = socketRef.current;
 
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      return;
+      return false;
     }
 
     ws.send(data);
+    return true;
   }, []);
 
   /**

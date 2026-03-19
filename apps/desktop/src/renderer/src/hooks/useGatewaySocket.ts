@@ -52,12 +52,17 @@ export function useGatewaySocket(): GatewaySocketState {
   const sessionIdRef = useRef(crypto.randomUUID());
   const seqOutRef = useRef(0);
 
+  // 请求关联：每次 sendTextMessage 生成唯一 requestId，
+  // 只接受 requestId 匹配的 llm.delta/llm.final，防止跨请求 stale delta 污染。
+  const activeRequestIdRef = useRef<string | null>(null);
+
   /**
    * 清空本地流式状态（断线 / 发新消息时调用）。
    */
   const clearStreamingState = useCallback(() => {
     setStreamingText("");
     setIsStreaming(false);
+    activeRequestIdRef.current = null;
   }, []);
 
   /**
@@ -89,7 +94,16 @@ export function useGatewaySocket(): GatewaySocketState {
 
     switch (type) {
       case WS_EVENT_TYPE.LlmDelta: {
-        const delta = (payload as { textDelta?: unknown })?.textDelta;
+        const deltaPayload = payload as { textDelta?: unknown; requestId?: unknown };
+        const delta = deltaPayload.textDelta;
+
+        // 只接受 requestId 匹配当前活跃请求的 delta，丢弃 stale 分片。
+        if (
+          typeof deltaPayload.requestId === "string" &&
+          deltaPayload.requestId !== activeRequestIdRef.current
+        ) {
+          break;
+        }
 
         if (typeof delta === "string") {
           setIsStreaming(true);
@@ -98,6 +112,16 @@ export function useGatewaySocket(): GatewaySocketState {
         break;
       }
       case WS_EVENT_TYPE.LlmFinal: {
+        const finalPayload = payload as { requestId?: unknown };
+
+        // 同样按 requestId 过滤，避免旧请求的 final 信号误关流式状态。
+        if (
+          typeof finalPayload.requestId === "string" &&
+          finalPayload.requestId !== activeRequestIdRef.current
+        ) {
+          break;
+        }
+
         // llm.final 仅作为完成信号，不覆盖气泡文本。
         setIsStreaming(false);
         break;
@@ -124,17 +148,22 @@ export function useGatewaySocket(): GatewaySocketState {
    */
   const sendTextMessage = useCallback(
     (text: string) => {
-      // 发新消息前主动打断旧流（被打断的流不会收到 llm.final）。
-      clearStreamingState();
+      const requestId = crypto.randomUUID();
 
       const envelope = createEnvelope({
         type: WS_EVENT_TYPE.TextUser,
         sessionId: sessionIdRef.current,
         seq: ++seqOutRef.current,
-        payload: { text }
+        payload: { text, requestId }
       });
 
-      send(JSON.stringify(envelope));
+      const sent = send(JSON.stringify(envelope));
+
+      // 仅在消息确认发出后才清空旧流并激活新的 requestId。
+      if (sent) {
+        clearStreamingState();
+        activeRequestIdRef.current = requestId;
+      }
     },
     [clearStreamingState, send]
   );

@@ -11,6 +11,10 @@ import type { Live2DInteractionController, Live2DSession } from "./types";
  *
  * 如果双击发生在上一次模型命中后的这段时间内，
  * 认为双击命中了模型本体，不触发空白区域回调。
+ *
+ * 已知限制：当前依赖 hit area 命中检测，模型可见区域中
+ * 没有定义 hit area 的部分仍可能被误判为空白区域。
+ * 完全覆盖需要 Pixi 级像素命中检测，MVP 阶段暂不引入。
  */
 const MODEL_HIT_SUPPRESS_MS = 500;
 

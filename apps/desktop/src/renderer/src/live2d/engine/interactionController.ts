@@ -164,13 +164,17 @@ export function createLive2DInteractionController(
       return;
     }
 
+    // 只要模型命中检测返回了有效 hit area 就通知上层，
+    // 无论是否有对应的 interaction plan。
+    // 用途：让 Live2DStage 记录命中时间以过滤空白区域双击。
+    onModelHit?.();
+
     const plan = resolveInteractionPlan(profile, hitAreaName, session.model);
 
     if (!plan) {
       return;
     }
 
-    onModelHit?.();
     executeInteractionPlan(plan);
   };
 

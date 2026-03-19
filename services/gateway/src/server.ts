@@ -116,7 +116,7 @@ export function createGatewayServer(): FastifyInstance {
               return;
             }
             case WS_EVENT_TYPE.TextUser: {
-              const payload = envelope.payload as { text?: unknown };
+              const payload = envelope.payload as { text?: unknown; requestId?: unknown };
               const text = typeof payload.text === "string" ? payload.text : "";
               if (!text) {
                 sendError({
@@ -126,6 +126,9 @@ export function createGatewayServer(): FastifyInstance {
                 });
                 return;
               }
+
+              // 透传 requestId，用于客户端过滤跨请求的 stale delta。
+              const requestId = typeof payload.requestId === "string" ? payload.requestId : undefined;
 
               // 关键逻辑：新输入会打断上一轮流式输出，避免多轮并发导致输出混乱。
               interrupt("new_text_user");
@@ -139,7 +142,7 @@ export function createGatewayServer(): FastifyInstance {
                       type: WS_EVENT_TYPE.LlmDelta,
                       sessionId,
                       seq: ++seqOut,
-                      payload: { textDelta: delta }
+                      payload: { textDelta: delta, requestId }
                     })
                   );
                 });
@@ -152,7 +155,8 @@ export function createGatewayServer(): FastifyInstance {
                       seq: ++seqOut,
                       payload: {
                         text:
-                          "（MVP）这是一段模拟的流式输出。后续这里将对接云端 LLM/TTS。"
+                          "（MVP）这是一段模拟的流式输出。后续这里将对接云端 LLM/TTS。",
+                        requestId
                       }
                     })
                   );
