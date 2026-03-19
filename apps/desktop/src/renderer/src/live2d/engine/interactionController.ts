@@ -8,6 +8,13 @@ import type {
 
 type CreateLive2DInteractionControllerOptions = {
   onError: (message: string) => void;
+  /**
+   * 当模型命中区域被点击时触发。
+   *
+   * 仅通知"命中发生"，不传递命中详情。
+   * 典型用途：让舞台层记录命中时间以过滤空白区域双击。
+   */
+  onModelHit?: () => void;
   profile: Live2DModelProfile;
   session: Live2DSession;
   shouldSuppressHit: () => boolean;
@@ -29,7 +36,7 @@ type CreateLive2DInteractionControllerOptions = {
 export function createLive2DInteractionController(
   options: CreateLive2DInteractionControllerOptions
 ): Live2DInteractionController {
-  const { onError, profile, session, shouldSuppressHit } = options;
+  const { onError, onModelHit, profile, session, shouldSuppressHit } = options;
   let destroyed = false;
   let interactionLocked = false;
   let interactionHoldTimerId: number | null = null;
@@ -163,6 +170,7 @@ export function createLive2DInteractionController(
       return;
     }
 
+    onModelHit?.();
     executeInteractionPlan(plan);
   };
 

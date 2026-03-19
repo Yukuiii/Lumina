@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useGatewaySocket } from "../hooks/useGatewaySocket";
+import type { ConnectionStatus } from "../hooks/useGatewaySocket";
 import { Live2DStage } from "../live2d/Live2DStage";
+import type { StageInteractionEvent } from "../live2d/Live2DStage";
 import { ChatBubble } from "./ChatBubble";
 import { ChatInput } from "./ChatInput";
+import type { InputMode } from "./ChatInput";
 import { ConnectionDot } from "./ConnectionDot";
 
 /**
@@ -34,9 +37,9 @@ function getRequestedModelId(): string | undefined {
 }
 
 /**
- * 根据连接状态返回输入栏 placeholder。
+ * 连接状态 → 输入栏 placeholder。
  */
-function getInputPlaceholder(status: string): string {
+function getInputPlaceholder(status: ConnectionStatus): string {
   switch (status) {
     case "connected":
       return "说点什么…";
@@ -44,6 +47,20 @@ function getInputPlaceholder(status: string): string {
       return "连接失败";
     default:
       return "连接中…";
+  }
+}
+
+/**
+ * 连接状态 → 输入栏模式。
+ */
+function getInputMode(status: ConnectionStatus): InputMode {
+  switch (status) {
+    case "connected":
+      return "active";
+    case "failed":
+      return "failed";
+    default:
+      return "disabled";
   }
 }
 
@@ -57,23 +74,24 @@ export function App(): React.JSX.Element {
   const { status, streamingText, isStreaming, sendTextMessage, retry } =
     useGatewaySocket();
   const [showInput, setShowInput] = useState(false);
-  const [bubbleText, setBubbleText] = useState("");
-  const [bubbleStreaming, setBubbleStreaming] = useState(false);
-  const [showBubble, setShowBubble] = useState(false);
   const [showHoverHint, setShowHoverHint] = useState(false);
   const hoverHintShownRef = useRef(false);
   const hoverTimerRef = useRef<number | null>(null);
 
-  // 同步 streamingText → 气泡状态。
+  // 气泡状态：直接从 hook 的 streamingText 派生，仅维护一个 "dismissed" 标记。
+  // streamingText 变空（断线/发新消息）时气泡立刻消失，淡出完成后标记 dismissed。
+  const [bubbleDismissed, setBubbleDismissed] = useState(false);
+  const prevStreamingTextRef = useRef("");
+
+  // 当 streamingText 变化（新文本到达或被清空）时，重置 dismissed 标记。
   useEffect(() => {
-    if (streamingText) {
-      setBubbleText(streamingText);
-      setBubbleStreaming(isStreaming);
-      setShowBubble(true);
-    } else if (!isStreaming) {
-      setBubbleStreaming(false);
+    if (streamingText !== prevStreamingTextRef.current) {
+      prevStreamingTextRef.current = streamingText;
+      setBubbleDismissed(false);
     }
-  }, [streamingText, isStreaming]);
+  }, [streamingText]);
+
+  const showBubble = !!streamingText && !bubbleDismissed;
 
   // 全局 Enter 快捷键（窗口聚焦时）→ 弹出输入框。
   useEffect(() => {
@@ -90,21 +108,21 @@ export function App(): React.JSX.Element {
 
   const handleSend = useCallback(
     (text: string) => {
-      // 发新消息前清空旧气泡。
-      setBubbleText("");
-      setShowBubble(false);
       sendTextMessage(text);
     },
     [sendTextMessage]
   );
 
   const handleBubbleFadeComplete = useCallback(() => {
-    setShowBubble(false);
-    setBubbleText("");
+    setBubbleDismissed(true);
   }, []);
 
-  const handleDoubleClick = useCallback(() => {
-    setShowInput(true);
+  const handleStageInteraction = useCallback((event: StageInteractionEvent) => {
+    switch (event.kind) {
+      case "blank-area-tap":
+        setShowInput(true);
+        break;
+    }
   }, []);
 
   const handleCloseInput = useCallback(() => {
@@ -165,14 +183,14 @@ export function App(): React.JSX.Element {
     >
       <Live2DStage
         modelId={getRequestedModelId()}
-        onDoubleClick={handleDoubleClick}
+        onStageInteraction={handleStageInteraction}
       />
       <ConnectionDot status={status} />
-      {showBubble && bubbleText ? (
+      {showBubble ? (
         <ChatBubble
-          isStreaming={bubbleStreaming}
+          isStreaming={isStreaming}
           onFadeComplete={handleBubbleFadeComplete}
-          text={bubbleText}
+          text={streamingText}
         />
       ) : null}
       {showHoverHint && !showInput ? (
@@ -181,12 +199,11 @@ export function App(): React.JSX.Element {
       {showInput ? (
         <div ref={chatInputContainerRef}>
           <ChatInput
-            disabled={status !== "connected"}
+            mode={getInputMode(status)}
             onClose={handleCloseInput}
             onRetry={retry}
             onSend={handleSend}
             placeholder={getInputPlaceholder(status)}
-            showRetry={status === "failed"}
           />
         </div>
       ) : null}

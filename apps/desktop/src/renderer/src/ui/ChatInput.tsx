@@ -1,11 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
 
 /**
+ * 输入栏模式，直接映射连接状态。
+ *
+ * - `active`：已连接，允许输入和发送
+ * - `disabled`：连接中 / 已断开，输入和按钮均不可用
+ * - `failed`：重连耗尽，输入禁用，按钮变为"重试"
+ */
+export type InputMode = "active" | "disabled" | "failed";
+
+/**
  * 对话输入栏组件参数。
  */
 type ChatInputProps = {
-  /** 是否禁用输入（非 connected 状态）。 */
-  disabled: boolean;
+  /** 输入栏当前模式。 */
+  mode: InputMode;
   /** 关闭输入栏。 */
   onClose: () => void;
   /** 重连耗尽后的重试回调。 */
@@ -14,25 +23,28 @@ type ChatInputProps = {
   onSend: (text: string) => void;
   /** 输入框占位文本。 */
   placeholder: string;
-  /** 是否显示重试按钮（`failed` 状态）。 */
-  showRetry: boolean;
 };
 
 /**
  * 底部浮动输入栏。
  *
- * - `Enter` 发送（仅 connected 时）
+ * - `Enter` 发送（仅 `active` 模式）
  * - `Escape` 关闭
  * - 自动聚焦
- * - `failed` 状态下发送按钮变为重试按钮
+ * - `failed` 模式下发送按钮变为重试按钮，输入框禁用
  */
 export function ChatInput(props: ChatInputProps): React.JSX.Element {
-  const { disabled, placeholder, showRetry, onSend, onClose, onRetry } = props;
+  const { mode, placeholder, onSend, onClose, onRetry } = props;
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  const isActive = mode === "active";
+  const isFailed = mode === "failed";
+
   useEffect(() => {
-    // 挂载后自动聚焦，延迟一帧确保 DOM 已渲染。
+    // active 模式下挂载后自动聚焦，延迟一帧确保 DOM 已渲染。
+    if (!isActive) return;
+
     const frame = window.requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
@@ -40,7 +52,7 @@ export function ChatInput(props: ChatInputProps): React.JSX.Element {
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [isActive]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (event.key === "Escape") {
@@ -49,7 +61,7 @@ export function ChatInput(props: ChatInputProps): React.JSX.Element {
       return;
     }
 
-    if (event.key === "Enter" && !event.nativeEvent.isComposing && !disabled) {
+    if (event.key === "Enter" && !event.nativeEvent.isComposing && isActive) {
       event.preventDefault();
       const trimmed = value.trim();
 
@@ -63,12 +75,12 @@ export function ChatInput(props: ChatInputProps): React.JSX.Element {
   };
 
   const handleSendClick = (): void => {
-    if (showRetry) {
+    if (isFailed) {
       onRetry();
       return;
     }
 
-    if (disabled) {
+    if (!isActive) {
       return;
     }
 
@@ -88,7 +100,7 @@ export function ChatInput(props: ChatInputProps): React.JSX.Element {
       <input
         ref={inputRef}
         className="chat-input-field"
-        disabled={disabled && !showRetry}
+        disabled={!isActive}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
@@ -100,7 +112,7 @@ export function ChatInput(props: ChatInputProps): React.JSX.Element {
         onClick={handleSendClick}
         type="button"
       >
-        {showRetry ? (
+        {isFailed ? (
           <svg viewBox="0 0 16 16">
             <path d="M13 7a5 5 0 0 0-9.17-1.5M3 9a5 5 0 0 0 9.17 1.5" />
             <polyline points="13 3 13 7 9 7" />
