@@ -136,6 +136,7 @@ function createMainWindow(): BrowserWindow {
     transparent: true,
     backgroundColor: "#00000000",
     frame: false,
+    hasShadow: false,
     resizable: false,
     maximizable: false,
     fullscreenable: false,

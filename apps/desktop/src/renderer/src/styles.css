@@ -61,9 +61,11 @@ body {
   font-size: 12px;
   color: #fff;
   backdrop-filter: blur(10px);
+  pointer-events: none;
 }
 
 .stage-overlay.is-error {
+  top: 46px;
   background: rgba(107, 18, 32, 0.82);
   border-color: rgba(255, 145, 145, 0.24);
 }

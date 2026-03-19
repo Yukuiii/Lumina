@@ -1,272 +1,57 @@
-import React, { useEffect, useEffectEvent, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as PIXI from "pixi.js";
-import type { Live2DModel as Live2DModelType } from "@jannchie/pixi-live2d-display/cubism4";
 
-const MODEL_ENTRY_PATH = "AzueLane/aierdeliqi_5/aierdeliqi_5.model3.json";
-const MODEL_SCALE_BOOST = 1.06;
-const MODEL_BOUNDS_TRIM_RATIO = 0.01;
-const MODEL_CENTER_OFFSET_X = -14;
+import { resolvePlacementAccent } from "./accents/placementAccents";
+import { DEFAULT_LIVE2D_MODEL_PROFILE } from "./config/modelProfiles";
+import { ensureCubismCoreLoaded } from "./engine/cubismCore";
+import { resolveInteractionPlan } from "./engine/interactionResolver";
+import { useDesktopPetDrag } from "./hooks/useDesktopPetDrag";
+import { applyModelPlacement, fitModelToStage, fitModelWhenReady } from "./layout/modelPlacement";
+import type {
+  Live2DWindow,
+  ModelPlacement,
+  PlacementAccentSpec,
+  RendererWithGl,
+  ResolvedInteractionPlan
+} from "./types";
 
-type Live2DWindow = Window & {
-  PIXI?: typeof PIXI;
-  Live2DCubismCore?: unknown;
-  app?: PIXI.Application;
-};
-
-type RendererWithGl = PIXI.Renderer & {
-  gl?: WebGLRenderingContext | WebGL2RenderingContext;
-};
-
-type DragState = {
-  pointerId: number;
-  startScreenX: number;
-  startScreenY: number;
-  lastScreenX: number;
-  lastScreenY: number;
-  hasMoved: boolean;
-};
-
-let cubismCoreLoader: Promise<void> | null = null;
+const ACTIVE_MODEL_PROFILE = DEFAULT_LIVE2D_MODEL_PROFILE;
 
 /**
- * 确保 Cubism Core 运行时只被加载一次。
- */
-function ensureCubismCoreLoaded(scriptUrl: string): Promise<void> {
-  const live2dWindow = window as Live2DWindow;
-
-  if (live2dWindow.Live2DCubismCore) {
-    return Promise.resolve();
-  }
-
-  if (cubismCoreLoader) {
-    return cubismCoreLoader;
-  }
-
-  cubismCoreLoader = new Promise<void>((resolve, reject) => {
-    const existingScript = document.querySelector<HTMLScriptElement>('script[data-live2d-core="true"]');
-
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve(), { once: true });
-      existingScript.addEventListener("error", () => reject(new Error("Cubism Core 脚本加载失败。")), {
-        once: true
-      });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.async = true;
-    script.dataset.live2dCore = "true";
-    script.src = scriptUrl;
-    script.addEventListener("load", () => resolve(), { once: true });
-    script.addEventListener("error", () => reject(new Error("Cubism Core 脚本加载失败。")), {
-      once: true
-    });
-    document.head.appendChild(script);
-  });
-
-  return cubismCoreLoader;
-}
-
-/**
- * 计算模型所有 drawable 顶点的包围盒，可选忽略少量离群点，避免异常顶点把模型压得过小。
- */
-function getDrawableBounds(
-  model: Live2DModelType,
-  trimRatio = 0
-): { x: number; y: number; width: number; height: number } | null {
-  const internalModel = model.internalModel;
-
-  if (!internalModel) {
-    return null;
-  }
-
-  const xs: number[] = [];
-  const ys: number[] = [];
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-
-  for (const drawableId of internalModel.getDrawableIDs()) {
-    const vertices = internalModel.getDrawableVertices(drawableId);
-
-    for (let index = 0; index < vertices.length; index += 2) {
-      const x = vertices[index];
-      const y = vertices[index + 1];
-
-      if (!Number.isFinite(x) || !Number.isFinite(y)) {
-        continue;
-      }
-
-      xs.push(x);
-      ys.push(y);
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-    }
-  }
-
-  if (!xs.length || !ys.length) {
-    return null;
-  }
-
-  if (trimRatio > 0 && xs.length > 64) {
-    const sortedXs = [...xs].sort((left, right) => left - right);
-    const sortedYs = [...ys].sort((left, right) => left - right);
-    const startIndex = Math.min(Math.floor(sortedXs.length * trimRatio), sortedXs.length - 1);
-    const endIndex = Math.max(startIndex, Math.ceil(sortedXs.length * (1 - trimRatio)) - 1);
-
-    minX = sortedXs[startIndex];
-    maxX = sortedXs[endIndex];
-    minY = sortedYs[startIndex];
-    maxY = sortedYs[endIndex];
-  }
-
-  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
-    return null;
-  }
-
-  return {
-    x: minX,
-    y: minY,
-    width: maxX - minX,
-    height: maxY - minY
-  };
-}
-
-/**
- * 根据当前舞台尺寸计算模型的显示比例与位置。
- */
-function fitModelToStage(model: Live2DModelType, host: HTMLElement): void {
-  const stageWidth = host.clientWidth;
-  const stageHeight = host.clientHeight;
-  const drawableBounds = getDrawableBounds(model, MODEL_BOUNDS_TRIM_RATIO) ?? getDrawableBounds(model);
-
-  if (!stageWidth || !stageHeight || !drawableBounds || !drawableBounds.width || !drawableBounds.height) {
-    return;
-  }
-
-  const fitScale = Math.min((stageWidth * 0.84) / drawableBounds.width, (stageHeight * 0.92) / drawableBounds.height);
-  // 让模型尽量占满舞台主体区域，同时保留少量安全边距避免被裁切。
-  const scale = fitScale * MODEL_SCALE_BOOST;
-
-  model.scale.set(scale);
-  model.x = stageWidth / 2 - (drawableBounds.x + drawableBounds.width / 2) * scale + MODEL_CENTER_OFFSET_X;
-  model.y = stageHeight / 2 - (drawableBounds.y + drawableBounds.height / 2) * scale;
-}
-
-/**
- * 等待模型拿到可用尺寸后再进行舞台适配，避免首次测量为 0 导致模型几乎不可见。
- */
-function fitModelWhenReady(model: Live2DModelType, host: HTMLElement, retries = 12): void {
-  fitModelToStage(model, host);
-
-  const hasLogicalSize = Boolean(model.internalModel?.width && model.internalModel?.height);
-  const bounds = model.getLocalBounds();
-  const hasBounds = Boolean(bounds.width && bounds.height);
-
-  if ((hasLogicalSize || hasBounds) || retries <= 0) {
-    return;
-  }
-
-  window.requestAnimationFrame(() => {
-    fitModelWhenReady(model, host, retries - 1);
-  });
-}
-
-/**
- * 将点击命中的区域名映射到模型 motion group。
- */
-function toTapMotionGroup(hitAreaName: string): string {
-  return `Tap${hitAreaName}`;
-}
-
-/**
- * Live2D 舞台组件，负责初始化 Pixi 舞台并加载本地模型。
+ * Live2D 舞台组件。
+ *
+ * 组件职责被刻意限制为“React 组装层”：
+ * - 创建并销毁 Pixi / Live2D 运行时
+ * - 连接模型 profile 与运行时执行器
+ * - 挂载窗口拖动手势
+ * - 渲染调试状态与错误信息
+ *
+ * 模型摆放、外部 accent、命中区域策略、拖动逻辑都已经拆到独立模块，
+ * 以便未来切换默认模型或新增 profile 时不再继续污染组件主体。
+ *
+ * @returns 桌宠渲染舞台。
  */
 export function Live2DStage(): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const dragStateRef = useRef<DragState | null>(null);
-  const suppressHitUntilRef = useRef<number>(0);
+  const basePlacementRef = useRef<ModelPlacement | null>(null);
+  const placementAccentFrameRef = useRef<number | null>(null);
+  const interactionHoldTimerRef = useRef<number | null>(null);
+  const isInteractionLockedRef = useRef<boolean>(false);
   const [errorText, setErrorText] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [statusText, setStatusText] = useState<string | null>(null);
+  const { handlePointerDown, handlePointerMove, handlePointerRelease, isDragging, shouldSuppressHit } =
+    useDesktopPetDrag();
 
   /**
-   * 开始记录窗口拖动所需的指针状态。
+   * 初始化并持有一次完整的 Pixi / Live2D 会话。
+   *
+   * 这里故意使用空依赖数组：
+   * - `statusText`、`errorText`、`isDragging` 这类 React 渲染态不应该触发底层会话重建
+   * - `shouldSuppressHit` 是 `useEffectEvent`，只应在事件回调里读取最新逻辑，不应参与 effect 依赖
+   *
+   * 一旦这个 effect 因普通重渲染而重复执行，就会在 cleanup 中销毁 Pixi / Live2D，
+   * 导致点击后模型闪退或直接消失。
    */
-  const handlePointerDown = useEffectEvent((event: React.PointerEvent<HTMLDivElement>): void => {
-    if (event.button !== 0) {
-      return;
-    }
-
-    dragStateRef.current = {
-      pointerId: event.pointerId,
-      startScreenX: event.screenX,
-      startScreenY: event.screenY,
-      lastScreenX: event.screenX,
-      lastScreenY: event.screenY,
-      hasMoved: false
-    };
-  });
-
-  /**
-   * 根据指针位移拖动当前桌宠窗口，并在达到阈值后屏蔽误触发的点击动作。
-   */
-  const handlePointerMove = useEffectEvent((event: React.PointerEvent<HTMLDivElement>): void => {
-    const dragState = dragStateRef.current;
-
-    if (!dragState || dragState.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const totalDeltaX = event.screenX - dragState.startScreenX;
-    const totalDeltaY = event.screenY - dragState.startScreenY;
-    const stepDeltaX = event.screenX - dragState.lastScreenX;
-    const stepDeltaY = event.screenY - dragState.lastScreenY;
-
-    if (!dragState.hasMoved) {
-      // 只有明显移动后才进入拖动状态，避免普通点击也把窗口拽走。
-      if (Math.hypot(totalDeltaX, totalDeltaY) < 6) {
-        return;
-      }
-
-      event.currentTarget.setPointerCapture(event.pointerId);
-      dragState.hasMoved = true;
-      setIsDragging(true);
-    }
-
-    if (!stepDeltaX && !stepDeltaY) {
-      return;
-    }
-
-    dragState.lastScreenX = event.screenX;
-    dragState.lastScreenY = event.screenY;
-    window.lumina.dragWindowBy(stepDeltaX, stepDeltaY);
-  });
-
-  /**
-   * 结束窗口拖动，并短暂屏蔽拖动后的模型点击命中。
-   */
-  const handlePointerRelease = useEffectEvent((event: React.PointerEvent<HTMLDivElement>): void => {
-    const dragState = dragStateRef.current;
-
-    if (!dragState || dragState.pointerId !== event.pointerId) {
-      return;
-    }
-
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-
-    if (dragState.hasMoved) {
-      suppressHitUntilRef.current = Date.now() + 180;
-    }
-
-    dragStateRef.current = null;
-    setIsDragging(false);
-  });
-
   useEffect(() => {
     const host = hostRef.current;
 
@@ -277,6 +62,7 @@ export function Live2DStage(): React.JSX.Element {
     let disposed = false;
     let resizeObserver: ResizeObserver | null = null;
     let pixiApp: PIXI.Application | null = null;
+    let cleanupMotionFinishListener: (() => void) | null = null;
 
     void (async () => {
       await ensureCubismCoreLoaded(window.lumina.getLive2DCoreScriptUrl());
@@ -294,6 +80,12 @@ export function Live2DStage(): React.JSX.Element {
         antialias: true,
         autoDensity: true,
         backgroundAlpha: 0,
+        /**
+         * 透明 Electron 窗口对预乘 alpha 非常敏感。
+         *
+         * 如果这里和模型贴图的实际渲染链不匹配，周围容易出现暗边、黑框或发灰边缘。
+         */
+        premultipliedAlpha: false,
         powerPreference: "high-performance",
         preference: "webgl",
         resizeTo: host
@@ -310,11 +102,10 @@ export function Live2DStage(): React.JSX.Element {
       pixiApp = app;
       host.replaceChildren(app.canvas);
       const rendererWithGl = app.renderer as RendererWithGl;
-
-      const model = await Live2DModel.from(window.lumina.getLive2DModelUrl(MODEL_ENTRY_PATH), {
-        autoUpdate: true,
-        autoHitTest: true,
+      const model = await Live2DModel.from(window.lumina.getLive2DModelUrl(ACTIVE_MODEL_PROFILE.entryPath), {
         autoFocus: true,
+        autoHitTest: false,
+        autoUpdate: true,
         ticker: app.ticker
       });
 
@@ -323,20 +114,207 @@ export function Live2DStage(): React.JSX.Element {
         return;
       }
 
-      // 该库在 Pixi v8 + Electron 下对 renderer 的自动探测不稳定，这里直接绑定当前舞台 renderer。
+      /**
+       * `pixi-live2d-display` 在 Pixi v8 + Electron 组合下对 renderer 的自动探测不稳定，
+       * 这里显式把当前舞台 renderer 绑定到模型实例，确保 hitTest 与渲染上下文一致。
+       *
+       * 该库对 `renderer` 的类型声明仍以 WebGLRenderer 为主，而 Electron + Pixi v8
+       * 实际返回的 renderer 联合类型更宽。这里使用受控的 `any` 只做一次桥接赋值，
+       * 避免把库的声明限制继续扩散到我们自己的类型系统中。
+       */
       const unsafeModel = model as any;
       unsafeModel.renderer = rendererWithGl;
       model.eventMode = "static";
       model.cursor = "grab";
+      app.stage.eventMode = "static";
+      app.stage.hitArea = app.screen;
       app.stage.addChild(model);
       app.render();
-      fitModelWhenReady(model, host);
 
-      // 模型目录里已经定义了 Idle 分组，加载后立即进入站立待机状态。
-      void model.motion("Idle");
+      /**
+       * 清理当前正在播放的外部 placement accent，并把模型恢复到基础 placement。
+       */
+      const clearPlacementAccent = (): void => {
+        if (placementAccentFrameRef.current !== null) {
+          window.cancelAnimationFrame(placementAccentFrameRef.current);
+          placementAccentFrameRef.current = null;
+        }
 
-      model.on("hit", (hitAreas: string[]) => {
-        if (Date.now() < suppressHitUntilRef.current) {
+        if (basePlacementRef.current) {
+          applyModelPlacement(model, basePlacementRef.current);
+        }
+      };
+
+      /**
+       * 播放一次外部安全 accent。
+       *
+       * 该动画只作用于 Pixi 容器层，不会污染模型内部参数，因此可作为
+       * “模型自带 motion 不可靠时”的低风险兜底反馈。
+       *
+       * @param accent 需要播放的 accent 配置。
+       */
+      const playPlacementAccent = (accent: PlacementAccentSpec): void => {
+        clearPlacementAccent();
+
+        const startedAt = performance.now();
+        const step = (now: number): void => {
+          const placement = basePlacementRef.current;
+
+          if (!placement) {
+            placementAccentFrameRef.current = null;
+            return;
+          }
+
+          const progress = Math.min((now - startedAt) / accent.durationMs, 1);
+          applyModelPlacement(model, placement, resolvePlacementAccent(accent, progress));
+
+          if (progress >= 1) {
+            placementAccentFrameRef.current = null;
+            applyModelPlacement(model, placement);
+            return;
+          }
+
+          placementAccentFrameRef.current = window.requestAnimationFrame(step);
+        };
+
+        placementAccentFrameRef.current = window.requestAnimationFrame(step);
+      };
+
+      fitModelWhenReady(model, host, ACTIVE_MODEL_PROFILE.placement, (placement) => {
+        if (placement) {
+          basePlacementRef.current = placement;
+        }
+      });
+
+      const motionManager = model.internalModel?.motionManager;
+
+      /**
+       * 清理当前交互锁对应的定时器。
+       */
+      const clearInteractionHoldTimer = (): void => {
+        if (interactionHoldTimerRef.current === null) {
+          return;
+        }
+
+        window.clearTimeout(interactionHoldTimerRef.current);
+        interactionHoldTimerRef.current = null;
+      };
+
+      /**
+       * 解除输入锁。
+       */
+      const unlockInteraction = (): void => {
+        isInteractionLockedRef.current = false;
+      };
+
+      /**
+       * 强制停止当前 motion，并切回 profile 定义的 Idle。
+       *
+       * 这一步是当前默认模型的关键安全补丁：
+       * 某些点击动作会长期维持循环状态或残留部件可见，必须在固定时机回到待机。
+       */
+      const resumeIdleMotion = (): void => {
+        clearInteractionHoldTimer();
+        unlockInteraction();
+        motionManager?.stopAllMotions();
+        void model.motion(ACTIVE_MODEL_PROFILE.idle.group, undefined, ACTIVE_MODEL_PROFILE.idle.priority);
+      };
+
+      /**
+       * 根据交互计划设置输入锁与自动回退策略。
+       *
+       * @param plan 已解析完成、准备执行的交互计划。
+       */
+      const scheduleInteractionRelease = (plan: ResolvedInteractionPlan): void => {
+        if (!("lockInput" in plan) || !plan.lockInput) {
+          return;
+        }
+
+        clearInteractionHoldTimer();
+        isInteractionLockedRef.current = true;
+        interactionHoldTimerRef.current = window.setTimeout(() => {
+          if (plan.kind === "motion" && plan.resumeIdle) {
+            resumeIdleMotion();
+            return;
+          }
+
+          clearInteractionHoldTimer();
+          unlockInteraction();
+        }, plan.holdMs);
+      };
+
+      /**
+       * 响应 motion 自然结束事件。
+       *
+       * 对于非循环或被库内部正常结束的动作，这里负责兜底清掉输入锁。
+       */
+      const handleMotionFinish = (): void => {
+        clearInteractionHoldTimer();
+        unlockInteraction();
+      };
+
+      motionManager?.on("motionFinish", handleMotionFinish);
+      cleanupMotionFinishListener = () => {
+        motionManager?.off("motionFinish", handleMotionFinish);
+      };
+
+      /**
+       * 启动待机动作。
+       *
+       * Idle 使用 profile 中定义的低优先级，以避免与主动点击交互互相抢占。
+       */
+      void model.motion(ACTIVE_MODEL_PROFILE.idle.group, undefined, ACTIVE_MODEL_PROFILE.idle.priority);
+
+      /**
+       * 执行一次已经解析好的交互计划。
+       *
+       * @param plan 命中区域对应的运行时执行计划。
+       */
+      const executeInteractionPlan = (plan: ResolvedInteractionPlan): void => {
+        if (plan.kind === "ignore") {
+          return;
+        }
+
+        if (plan.kind === "accent-only") {
+          scheduleInteractionRelease(plan);
+          playPlacementAccent(plan.accent);
+          setStatusText(plan.label);
+          console.info("[Live2D]", plan.label);
+          return;
+        }
+
+        void Promise.resolve(model.motion(plan.motionGroup, plan.motionIndex))
+          .then((started) => {
+            if (!started) {
+              return;
+            }
+
+            scheduleInteractionRelease(plan);
+
+            if (plan.accent) {
+              playPlacementAccent(plan.accent);
+            }
+
+            setStatusText(plan.label);
+            console.info("[Live2D]", plan.label);
+          })
+          .catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            setErrorText(`动作触发失败：${message}`);
+          });
+      };
+
+      /**
+       * 把模型命中结果转换成可执行交互。
+       *
+       * @param hitAreas 命中的区域名列表。
+       */
+      const handleHitAreas = (hitAreas: string[]): void => {
+        if (shouldSuppressHit()) {
+          return;
+        }
+
+        if (isInteractionLockedRef.current) {
           return;
         }
 
@@ -346,11 +324,35 @@ export function Live2DStage(): React.JSX.Element {
           return;
         }
 
-        void model.motion(toTapMotionGroup(hitAreaName));
+        const plan = resolveInteractionPlan(ACTIVE_MODEL_PROFILE, hitAreaName, model);
+
+        if (!plan) {
+          return;
+        }
+
+        executeInteractionPlan(plan);
+      };
+
+      app.stage.on("pointertap", (event: PIXI.FederatedPointerEvent) => {
+        if (shouldSuppressHit()) {
+          return;
+        }
+
+        const hitAreas = model.hitTest(event.global.x, event.global.y);
+
+        if (!hitAreas.length) {
+          return;
+        }
+
+        handleHitAreas(hitAreas);
       });
 
       resizeObserver = new ResizeObserver(() => {
-        fitModelToStage(model, host);
+        const placement = fitModelToStage(model, host, ACTIVE_MODEL_PROFILE.placement);
+
+        if (placement) {
+          basePlacementRef.current = placement;
+        }
       });
       resizeObserver.observe(host);
     })().catch((error: unknown) => {
@@ -360,7 +362,21 @@ export function Live2DStage(): React.JSX.Element {
 
     return () => {
       disposed = true;
+
+      if (placementAccentFrameRef.current !== null) {
+        window.cancelAnimationFrame(placementAccentFrameRef.current);
+        placementAccentFrameRef.current = null;
+      }
+
+      if (interactionHoldTimerRef.current !== null) {
+        window.clearTimeout(interactionHoldTimerRef.current);
+        interactionHoldTimerRef.current = null;
+      }
+
+      isInteractionLockedRef.current = false;
       resizeObserver?.disconnect();
+      cleanupMotionFinishListener?.();
+      pixiApp?.stage.removeAllListeners();
       pixiApp?.destroy(true, { children: true, texture: true, textureSource: true, context: true });
       host.replaceChildren();
     };
@@ -375,6 +391,7 @@ export function Live2DStage(): React.JSX.Element {
       onPointerCancel={handlePointerRelease}
     >
       <div ref={hostRef} className="stage-canvas" />
+      {statusText ? <div className="stage-overlay">{statusText}</div> : null}
       {errorText ? <div className="stage-overlay is-error">{errorText}</div> : null}
     </div>
   );
