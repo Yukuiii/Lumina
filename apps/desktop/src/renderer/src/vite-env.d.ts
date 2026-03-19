@@ -1,5 +1,15 @@
 /// <reference types="vite/client" />
 
+interface ImportMetaEnv {
+  /**
+   * 可选的默认 Live2D 模型 profile id。
+   *
+   * 该值只用于 renderer 启动时选择当前默认内置模型，
+   * 未设置时回退到 profile 注册表中的默认项。
+   */
+  readonly VITE_LIVE2D_MODEL_ID?: string;
+}
+
 /**
  * preload 暴露到 window 的最小 API 声明。
  */

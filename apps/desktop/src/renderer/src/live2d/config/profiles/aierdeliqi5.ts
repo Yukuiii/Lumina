@@ -9,6 +9,7 @@ import type { Live2DModelProfile } from "../../types";
  * - 对已经验证不稳定的区域采用显式覆盖，而不是继续在组件里写 if / else
  */
 export const aierdeliqi5Profile: Live2DModelProfile = {
+  displayName: "Aierdeliqi 5",
   entryPath: "AzueLane/aierdeliqi_5/aierdeliqi_5.model3.json",
   id: "aierdeliqi_5",
   idle: {

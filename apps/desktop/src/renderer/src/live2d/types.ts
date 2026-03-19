@@ -1,3 +1,4 @@
+import type { Live2DModel as Live2DModelType } from "@jannchie/pixi-live2d-display/cubism4";
 import type { Application, Renderer } from "pixi.js";
 
 /**
@@ -200,6 +201,7 @@ export type Live2DInteractionConfig = {
  * - 命中区域交互
  */
 export type Live2DModelProfile = {
+  displayName: string;
   entryPath: string;
   id: string;
   idle: Live2DIdleConfig;
@@ -249,3 +251,29 @@ export type ResolvedInteractionPlan =
   | ResolvedMotionInteractionPlan
   | ResolvedAccentOnlyInteractionPlan
   | ResolvedIgnoreInteractionPlan;
+
+/**
+ * Live2D 会话层对外暴露的最小运行时能力。
+ *
+ * 该接口代表“一次已完成初始化的 Pixi + Live2D 会话”，
+ * React 组件不应直接操作更底层的 Pixi / model 生命周期细节。
+ */
+export type Live2DSession = {
+  destroy: () => void;
+  model: Live2DModelType;
+  onHit: (listener: (hitAreas: string[]) => void) => () => void;
+  onMotionFinish: (listener: () => void) => () => void;
+  playIdle: () => Promise<boolean>;
+  playMotion: (group: string, index?: number) => Promise<boolean>;
+  playPlacementAccent: (accent: PlacementAccentSpec) => void;
+  stopAllMotions: () => void;
+};
+
+/**
+ * 交互控制层的最小公开接口。
+ *
+ * 它负责管理输入锁、动作回退与交互执行，但不负责 React 渲染。
+ */
+export type Live2DInteractionController = {
+  destroy: () => void;
+};
