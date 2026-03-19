@@ -48,14 +48,16 @@
 ### Renderer 边界
 
 - `apps/desktop/src/renderer/src/main.tsx` 是渲染入口
-- `apps/desktop/src/renderer/src/ui/App.tsx` 当前保持很薄，负责解析当前 `modelId` 来源：`?model=...` -> `VITE_LIVE2D_MODEL_ID` -> 默认 profile，然后把结果传给 `Live2DStage`
+- `apps/desktop/src/renderer/src/ui/App.tsx` 当前负责编排 Gateway 连接（`useGatewaySocket`）、输入框可见性、气泡状态、全局快捷键，以及解析 `modelId` 来源：`?model=...` -> `VITE_LIVE2D_MODEL_ID` -> 默认 profile
+- `apps/desktop/src/renderer/src/ui/` 存放纯展示和轻交互组件（`ChatBubble`、`ChatInput`、`ConnectionDot`）
+- `apps/desktop/src/renderer/src/hooks/useGatewaySocket.ts` 管理渲染进程到 Gateway 的 WebSocket 连接、协议状态（`sessionId` / `seq`）、流式文本累积、自动重连与手动重试
 - `apps/desktop/src/renderer/src/live2d/Live2DStage.tsx` 现在是 React 组装层：解析 profile、创建/销毁 session、挂接 interaction controller、挂接窗口拖动 hook，并只渲染宿主容器与错误态
 - `apps/desktop/src/renderer/src/live2d/engine/live2dSession.ts` 负责 Pixi / Cubism 运行时资源：Application 创建销毁、模型挂载、placement、hit/motion 订阅、StrictMode 下的 abort 与 WebGL 资源回收
 - `apps/desktop/src/renderer/src/live2d/engine/interactionController.ts` 负责点击命中后的交互编排：输入锁、hold timer、回 Idle、动作失败报错
 - `apps/desktop/src/renderer/src/live2d/config/modelProfiles.ts` 与 `apps/desktop/src/renderer/src/live2d/config/profiles/*` 是多模型注册表与模型专属动作配置入口；新增模型或调整模型行为，优先改这里，不要回退到 `Live2DStage` 里写硬编码分支
 - `apps/desktop/src/renderer/src/live2d/hooks/useDesktopPetDrag.ts` 负责桌宠窗口拖动与命中抑制时序；`apps/desktop/src/renderer/src/live2d/types.ts` 负责 profile / session / controller 的最小契约
-- 当前没有全局状态管理库、通用组件库或 design system；已经存在局部 `live2d/hooks` 目录，但不要据此扩张成新的全局 hooks 架构
-- 当前样式主要在 `apps/desktop/src/renderer/src/styles.css`
+- 当前没有全局状态管理库或第三方 UI 库
+- 所有设计 token 集中在 `apps/desktop/src/renderer/src/styles.css` 的 `:root` 自定义属性中
 
 ### Gateway / Protocol 边界
 
@@ -111,11 +113,14 @@
 - 只有当跨区域共享、流式状态编排或复杂交互明显失控时，才考虑进一步抽象
 - 不要在没有现成使用场景时引入 Zustand、Redux、XState 等新状态层
 
-### 样式与 UI
+### 样式与设计 Token
 
 - 保持当前技术栈，不要无故引入 Tailwind、CSS-in-JS、第三方 UI 库
+- 所有可主题化的值（颜色、间距、圆角、字号、尺寸、动画时长）必须使用 `styles.css` `:root` 中定义的 CSS custom properties，禁止在组件样式中硬编码魔法值
+- 当前 token 分类：`--panel-*`（面板背景/边框/阴影/模糊）、`--text-*`（文本层级）、`--control-*`（交互控件）、`--status-*`（连接状态色）、`--space-*`（间距）、`--radius-*`（圆角）、`--font-size-*`（字号）、`--transition-*`（动画时长）、组件级尺寸（`--input-*`、`--send-btn-size`、`--dot-size`、`--bubble-max-width`）
+- 新增 UI 组件时，优先复用已有 token；确实需要新 token 时，在 `:root` 中按现有分类命名规范添加
 - 透明窗口、拖动体验、模型展示区域、渲染性能都是用户可感知约束，改动前要先理解现有行为
-- 如果某个样式只服务于单一复杂组件，可以局部整理；如果只是少量全局样式，继续沿用现有 `styles.css`
+- 如果某个样式只服务于单一复杂组件，可以局部整理；全局样式继续沿用 `styles.css`
 
 ### Electron 安全
 

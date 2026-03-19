@@ -1,5 +1,69 @@
 :root {
   color-scheme: light dark;
+
+  /* ── 色彩 token ── */
+
+  /* 基础面板 */
+  --panel-bg: rgba(6, 10, 16, 0.72);
+  --panel-bg-heavy: rgba(6, 10, 16, 0.78);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-border-light: rgba(255, 255, 255, 0.1);
+  --panel-shadow: 0 2px 12px rgba(0, 0, 0, 0.35), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
+  --panel-blur: 14px;
+
+  /* 文本 */
+  --text-primary: #fff;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --text-muted: rgba(255, 255, 255, 0.5);
+  --text-placeholder: rgba(255, 255, 255, 0.35);
+
+  /* 交互控件 */
+  --control-bg: rgba(255, 255, 255, 0.08);
+  --control-bg-hover: rgba(255, 255, 255, 0.16);
+  --control-disabled-opacity: 0.5;
+
+  /* 状态色 */
+  --status-connected: #34d058;
+  --status-connecting: #f0b72f;
+  --status-failed: #e45454;
+
+  /* 错误面板 */
+  --error-bg: rgba(107, 18, 32, 0.82);
+  --error-border: rgba(255, 145, 145, 0.24);
+
+  /* 气泡尾部（需要与 --panel-bg-heavy 保持一致） */
+  --bubble-tail-color: rgba(6, 10, 16, 0.78);
+
+  /* ── 间距 token ── */
+  --space-xs: 4px;
+  --space-sm: 6px;
+  --space-md: 8px;
+  --space-lg: 12px;
+  --space-xl: 14px;
+  --space-2xl: 16px;
+
+  /* ── 圆角 token ── */
+  --radius-sm: 12px;
+  --radius-md: 17px;
+  --radius-pill: 999px;
+
+  /* ── 字号 token ── */
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-md: 14px;
+
+  /* ── 尺寸 token ── */
+  --input-height: 34px;
+  --input-width: 72%;
+  --send-btn-size: 22px;
+  --send-icon-size: 12px;
+  --dot-size: 8px;
+  --bubble-max-width: 380px;
+
+  /* ── 动画 token ── */
+  --transition-fast: 0.15s;
+  --transition-normal: 0.3s;
+  --transition-slow: 0.5s;
 }
 
 html,
@@ -53,19 +117,223 @@ body {
   left: 10px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(6, 10, 16, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 12px;
-  color: #fff;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 10px;
+  border-radius: var(--radius-pill);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  font-size: var(--font-size-xs);
+  color: var(--text-primary);
   backdrop-filter: blur(10px);
   pointer-events: none;
 }
 
 .stage-overlay.is-error {
   top: 46px;
-  background: rgba(107, 18, 32, 0.82);
-  border-color: rgba(255, 145, 145, 0.24);
+  background: var(--error-bg);
+  border-color: var(--error-border);
+}
+
+/* ── 对话气泡 ── */
+
+.chat-bubble {
+  position: absolute;
+  top: var(--space-lg);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: var(--bubble-max-width);
+  padding: var(--space-md) var(--space-xl);
+  border-radius: var(--radius-sm);
+  background: var(--panel-bg-heavy);
+  border: 1px solid var(--panel-border-light);
+  backdrop-filter: blur(var(--panel-blur));
+  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  line-height: 1.5;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity var(--transition-normal) ease;
+  z-index: 10;
+}
+
+.chat-bubble.is-fading {
+  opacity: 0;
+}
+
+.chat-bubble-content {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.chat-bubble-cursor {
+  animation: cursor-blink 0.6s steps(2) infinite;
+}
+
+.chat-bubble-tail {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid var(--bubble-tail-color);
+}
+
+/* ── 输入栏 ── */
+
+.chat-input {
+  position: absolute;
+  bottom: var(--space-2xl);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: var(--input-width);
+  height: var(--input-height);
+  padding: 0 5px 0 var(--space-xl);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(var(--panel-blur));
+  box-shadow: var(--panel-shadow);
+  animation: slide-up 0.2s ease-out;
+  z-index: 10;
+}
+
+.chat-input-field {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.chat-input-field::placeholder {
+  color: var(--text-placeholder);
+}
+
+.chat-input-field:disabled {
+  opacity: var(--control-disabled-opacity);
+}
+
+.chat-input-send {
+  flex-shrink: 0;
+  width: var(--send-btn-size);
+  height: var(--send-btn-size);
+  border: none;
+  border-radius: 50%;
+  background: var(--control-bg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast);
+  padding: 0;
+}
+
+.chat-input-send:hover {
+  background: var(--control-bg-hover);
+}
+
+.chat-input-send svg {
+  width: var(--send-icon-size);
+  height: var(--send-icon-size);
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── 连接状态指示器 ── */
+
+.connection-dot {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: 50%;
+  opacity: 1;
+  transition: opacity var(--transition-slow) ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.connection-dot.is-hidden {
+  opacity: 0;
+}
+
+.connection-dot.is-connected {
+  background: var(--status-connected);
+}
+
+.connection-dot.is-connecting {
+  background: var(--status-connecting);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.connection-dot.is-failed {
+  background: var(--status-failed);
+}
+
+/* ── 悬停提示 ── */
+
+.hover-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-xs) var(--space-lg);
+  border-radius: var(--radius-sm);
+  background: rgba(6, 10, 16, 0.6);
+  backdrop-filter: blur(8px);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  pointer-events: none;
+  animation: fade-in-out 3s ease forwards;
+  z-index: 10;
+}
+
+/* ── 动画 ── */
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fade-in-out {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
 }

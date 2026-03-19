@@ -16,6 +16,10 @@ export type Live2DStageProps = {
    * 未传或未命中时，组件会自动回退到默认模型。
    */
   modelId?: string;
+  /**
+   * 双击舞台空白区域的回调，用于触发输入框等上层交互。
+   */
+  onDoubleClick?: () => void;
 };
 
 /**
@@ -35,7 +39,7 @@ export type Live2DStageProps = {
  * @returns 桌宠渲染舞台。
  */
 export function Live2DStage(props: Live2DStageProps): React.JSX.Element {
-  const { modelId } = props;
+  const { modelId, onDoubleClick } = props;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
   const { handlePointerDown, handlePointerMove, handlePointerRelease, isDragging, shouldSuppressHit } =
@@ -104,6 +108,7 @@ export function Live2DStage(props: Live2DStageProps): React.JSX.Element {
   return (
     <div
       className={`stage-shell${isDragging ? " is-dragging" : ""}`}
+      onDoubleClick={onDoubleClick}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerRelease}
