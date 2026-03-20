@@ -1,19 +1,24 @@
+import "dotenv/config";
+import { loadConfig } from "./config";
 import { createGatewayServer } from "./server";
 
 /**
  * 启动 Gateway 服务进程。
  */
 async function main(): Promise<void> {
-  const server = createGatewayServer();
-
-  const host = process.env.HOST ?? "127.0.0.1";
-  const port = Number(process.env.PORT ?? "8787");
-
   try {
-    await server.listen({ host, port });
-    server.log.info({ host, port }, "Gateway 已启动");
+    const config = loadConfig();
+    const server = createGatewayServer(config);
+
+    await server.listen({ host: config.host, port: config.port });
+    server.log.info(
+      { host: config.host, port: config.port, llm: `${config.llm.provider} ${config.llm.model} @ ${config.llm.baseUrl}` },
+      "Gateway 已启动"
+    );
   } catch (error) {
-    server.log.error(error, "Gateway 启动失败");
+    // loadConfig 校验失败或 server.listen 绑定失败都在这里捕获。
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Gateway 启动失败：${message}`);
     process.exitCode = 1;
   }
 }

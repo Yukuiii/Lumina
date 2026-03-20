@@ -8,16 +8,18 @@ import {
   WS_EVENT_TYPE,
   type WsEnvelope
 } from "@lumina/protocol";
+import type { GatewayConfig } from "./config";
+import { streamLlm } from "./llm/streamLlm";
 
 type FastifyInstance = ReturnType<typeof Fastify>;
 
 /**
- * 创建一个最小可用的 Gateway（负责 WS 会话与流式编排占位）。
+ * 创建 Gateway（负责 WS 会话与 LLM 流式编排）。
  */
-export function createGatewayServer(): FastifyInstance {
+export function createGatewayServer(config: GatewayConfig): FastifyInstance {
   const app = Fastify({
     logger: {
-      level: process.env.LOG_LEVEL ?? "info"
+      level: config.logLevel
     }
   });
 
@@ -136,15 +138,20 @@ export function createGatewayServer(): FastifyInstance {
               currentAbortController = abortController;
 
               try {
-                await streamMockLlm(text, abortController.signal, (delta) => {
-                  send(
-                    createEnvelope({
-                      type: WS_EVENT_TYPE.LlmDelta,
-                      sessionId,
-                      seq: ++seqOut,
-                      payload: { textDelta: delta, requestId }
-                    })
-                  );
+                const result = await streamLlm({
+                  config: config.llm,
+                  userMessage: text,
+                  signal: abortController.signal,
+                  onDelta: (delta) => {
+                    send(
+                      createEnvelope({
+                        type: WS_EVENT_TYPE.LlmDelta,
+                        sessionId,
+                        seq: ++seqOut,
+                        payload: { textDelta: delta, requestId }
+                      })
+                    );
+                  }
                 });
 
                 if (!abortController.signal.aborted) {
@@ -154,8 +161,7 @@ export function createGatewayServer(): FastifyInstance {
                       sessionId,
                       seq: ++seqOut,
                       payload: {
-                        text:
-                          "（MVP）这是一段模拟的流式输出。后续这里将对接云端 LLM/TTS。",
+                        text: result.fullText,
                         requestId
                       }
                     })
@@ -211,29 +217,4 @@ function rawDataToText(raw: RawData): string {
   if (raw instanceof ArrayBuffer) return Buffer.from(raw).toString("utf8");
   if (Array.isArray(raw)) return Buffer.concat(raw).toString("utf8");
   return raw.toString("utf8");
-}
-
-/**
- * 以固定文案模拟 LLM token 流（用于端到端联调与 UI 验证）。
- */
-async function streamMockLlm(
-  userText: string,
-  signal: AbortSignal,
-  onDelta: (delta: string) => void
-): Promise<void> {
-  const response = `你说："${userText}"。我收到了，正在思考...`;
-  const chunkSize = 4;
-
-  for (let i = 0; i < response.length; i += chunkSize) {
-    if (signal.aborted) return;
-    onDelta(response.slice(i, i + chunkSize));
-    await sleep(35);
-  }
-}
-
-/**
- * 基于 Promise 的 sleep 工具函数。
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
