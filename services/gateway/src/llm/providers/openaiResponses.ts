@@ -6,7 +6,7 @@ import type { LlmStreamOptions, LlmStreamResult } from "../types";
  *
  * ```
  * POST {baseUrl}/responses
- * body: { model, input, stream: true }
+ * body: { model, instructions, input: [{ role, content }], stream: true }
  * Auth: Authorization: Bearer {apiKey}
  *
  * 解析: event: response.output_text.delta → data: {"delta":"..."}
@@ -27,7 +27,8 @@ export async function streamOpenAiResponses(options: LlmStreamOptions): Promise<
       body: JSON.stringify({
         model: config.model,
         instructions: config.systemPrompt,
-        input: userMessage,
+        // 使用消息数组而不是纯字符串输入，以兼容部分 OpenAI-compatible 网关。
+        input: [{ role: "user", content: userMessage }],
         stream: true,
         ...(config.maxTokens > 0 ? { max_output_tokens: config.maxTokens } : {})
       })

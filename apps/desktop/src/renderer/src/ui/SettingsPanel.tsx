@@ -77,27 +77,58 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
     };
   }, []);
 
+  // ── Toast 自动清除 ──
+  const showToast = useCallback((message: string, type: "success" | "error") => {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+
+    setToast({ message, type });
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 2500);
+  }, []);
+
   // ── 加载 ──
   useEffect(() => {
     let cancelled = false;
 
-    void window.lumina.getSettings().then((settings) => {
-      if (cancelled) return;
+    const loadSettings = async (): Promise<void> => {
+      try {
+        const settings = await window.lumina.getSettings();
 
-      setProvider(settings.llm.provider);
-      setHasApiKey(settings.llm.hasApiKey);
-      setModel(settings.llm.model);
-      setBaseUrl(settings.llm.baseUrl);
-      setSystemPrompt(settings.llm.systemPrompt);
-      setMaxTokens(settings.llm.maxTokens);
-      setApiKeyMode(settings.llm.hasApiKey ? "display" : "edit");
-      setLoading(false);
-    });
+        if (cancelled) {
+          return;
+        }
+
+        setProvider(settings.llm.provider);
+        setHasApiKey(settings.llm.hasApiKey);
+        setModel(settings.llm.model);
+        setBaseUrl(settings.llm.baseUrl);
+        setSystemPrompt(settings.llm.systemPrompt);
+        setMaxTokens(settings.llm.maxTokens);
+        setApiKeyMode(settings.llm.hasApiKey ? "display" : "edit");
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : "未知错误";
+        showToast(`加载设置失败：${message}`, "error");
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadSettings();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showToast]);
 
   // ── Escape 关闭 ──
   useEffect(() => {
@@ -113,22 +144,14 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
     return () => window.removeEventListener("keydown", handler, true);
   }, [onClose]);
 
-  // ── Toast 自动清除 ──
-  const showToast = useCallback((message: string, type: "success" | "error") => {
-    if (toastTimerRef.current !== null) {
-      window.clearTimeout(toastTimerRef.current);
-    }
-
-    setToast({ message, type });
-    toastTimerRef.current = window.setTimeout(() => {
-      setToast(null);
-      toastTimerRef.current = null;
-    }, 2500);
-  }, []);
-
   // ── 保存 ──
   const handleSave = useCallback(async () => {
     setSaving(true);
+
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
 
     // apiKey 三值语义：edit + 有输入 > cleared > 保留旧值
     let apiKey: string | undefined;
@@ -140,24 +163,29 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
     }
     // else: undefined = 保留旧值
 
-    const result = await window.lumina.saveSettings({
-      llm: {
-        provider,
-        apiKey,
-        model,
-        baseUrl,
-        systemPrompt,
-        maxTokens
+    try {
+      const result = await window.lumina.saveSettings({
+        llm: {
+          provider,
+          apiKey,
+          model,
+          baseUrl,
+          systemPrompt,
+          maxTokens
+        }
+      });
+
+      if (result.ok) {
+        showToast("已保存 ✅", "success");
+        closeTimerRef.current = window.setTimeout(onClose, 1500);
+      } else {
+        showToast(result.error ?? "保存失败", "error");
       }
-    });
-
-    setSaving(false);
-
-    if (result.ok) {
-      showToast("已保存 ✅", "success");
-      closeTimerRef.current = window.setTimeout(onClose, 1500);
-    } else {
-      showToast(result.error ?? "保存失败", "error");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "未知错误";
+      showToast(`保存失败：${message}`, "error");
+    } finally {
+      setSaving(false);
     }
   }, [provider, apiKeyMode, apiKeyInput, apiKeyCleared, model, baseUrl, systemPrompt, maxTokens, onClose, showToast]);
 
@@ -295,8 +323,9 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
             <input
               className="settings-input"
               min={0}
-              onChange={(e) => setMaxTokens(Number(e.target.value) || 0)}
+              onChange={(e) => setMaxTokens(e.target.value === "" ? 0 : Number(e.target.value))}
               placeholder="默认"
+              step={1}
               type="number"
               value={maxTokens || ""}
             />

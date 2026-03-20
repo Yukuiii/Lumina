@@ -21,6 +21,8 @@ export type GatewaySocketState = {
   status: "connecting" | "connected" | "disconnected" | "failed";
   /** `llm.delta` 逐帧追加的累积文本，是气泡的唯一文本来源。 */
   streamingText: string;
+  /** 最近一次服务端错误文本（用于 UI 展示）。 */
+  errorText: string;
   /** 是否正在接收 `llm.delta` 流。 */
   isStreaming: boolean;
   /** 发送文本消息（仅 `connected` 时有效）。 */
@@ -47,6 +49,7 @@ export type GatewaySocketState = {
 export function useGatewaySocket(): GatewaySocketState {
   const [streamingText, setStreamingText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [errorText, setErrorText] = useState("");
 
   // 协议状态：sessionId 整个组件生命周期内不变，seqOut 全局单调递增不因重连重置。
   const sessionIdRef = useRef(crypto.randomUUID());
@@ -62,6 +65,7 @@ export function useGatewaySocket(): GatewaySocketState {
   const clearStreamingState = useCallback(() => {
     setStreamingText("");
     setIsStreaming(false);
+    setErrorText("");
     activeRequestIdRef.current = null;
   }, []);
 
@@ -127,8 +131,11 @@ export function useGatewaySocket(): GatewaySocketState {
         break;
       }
       case WS_EVENT_TYPE.Error: {
-        const errorPayload = payload as { code?: string; message?: string };
-        console.error("[GatewaySocket] 服务端错误:", errorPayload.code, errorPayload.message);
+        const errorPayload = payload as { code?: string; message?: string; detail?: { message?: string } };
+        const msg = errorPayload.detail?.message || errorPayload.message || "未知错误";
+        console.error("[GatewaySocket] 服务端错误:", errorPayload.code, msg);
+        setErrorText(`${msg}`);
+        setIsStreaming(false);
         break;
       }
       default:
@@ -171,6 +178,7 @@ export function useGatewaySocket(): GatewaySocketState {
   return {
     status,
     streamingText,
+    errorText,
     isStreaming,
     sendTextMessage,
     retry

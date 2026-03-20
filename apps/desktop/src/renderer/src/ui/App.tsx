@@ -71,27 +71,31 @@ function getInputMode(status: ConnectionStatus): InputMode {
  * Live2D 渲染委托给 `Live2DStage`。
  */
 export function App(): React.JSX.Element {
-  const { status, streamingText, isStreaming, sendTextMessage, retry } =
+  const { status, streamingText, errorText, isStreaming, sendTextMessage, retry } =
     useGatewaySocket();
   const [showInput, setShowInput] = useState(false);
   const [showHoverHint, setShowHoverHint] = useState(false);
   const hoverHintShownRef = useRef(false);
   const hoverTimerRef = useRef<number | null>(null);
 
-  // 气泡状态：直接从 hook 的 streamingText 派生，仅维护一个 "dismissed" 标记。
-  // streamingText 变空（断线/发新消息）时气泡立刻消失，淡出完成后标记 dismissed。
+  // 气泡状态：直接从 hook 的 bubbleText 派生，仅维护一个 "dismissed" 标记。
+  // bubbleText 变空（断线/发新消息）时气泡立刻消失，淡出完成后标记 dismissed。
   const [bubbleDismissed, setBubbleDismissed] = useState(false);
-  const prevStreamingTextRef = useRef("");
+  const prevBubbleTextRef = useRef("");
 
-  // 当 streamingText 变化（新文本到达或被清空）时，重置 dismissed 标记。
+  // 错误提示优先于流式文本，避免 partial delta 把错误信息盖住。
+  const bubbleText = errorText || streamingText;
+
+  // 当气泡文本变化（新文本 / 错误 / 被清空）时，重置 dismissed 标记。
   useEffect(() => {
-    if (streamingText !== prevStreamingTextRef.current) {
-      prevStreamingTextRef.current = streamingText;
+    if (bubbleText !== prevBubbleTextRef.current) {
+      prevBubbleTextRef.current = bubbleText;
       setBubbleDismissed(false);
     }
-  }, [streamingText]);
+  }, [bubbleText]);
 
-  const showBubble = !!streamingText && !bubbleDismissed;
+  // 气泡显示条件：有流式文本或有错误文本时显示。
+  const showBubble = !!bubbleText && !bubbleDismissed;
 
   // 全局 Enter 快捷键（窗口聚焦时）→ 弹出输入框。
   // 全局 Cmd+, / Ctrl+, → 打开设置子窗口。
@@ -199,7 +203,7 @@ export function App(): React.JSX.Element {
         <ChatBubble
           isStreaming={isStreaming}
           onFadeComplete={handleBubbleFadeComplete}
-          text={streamingText}
+          text={bubbleText}
         />
       ) : null}
       {showHoverHint && !showInput ? (

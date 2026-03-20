@@ -8,7 +8,7 @@ import {
   WS_EVENT_TYPE,
   type WsEnvelope
 } from "@lumina/protocol";
-import type { GatewayConfig } from "./config";
+import { loadLlmConfig, type GatewayConfig } from "./config";
 import { streamLlm } from "./llm/streamLlm";
 
 type FastifyInstance = ReturnType<typeof Fastify>;
@@ -138,8 +138,10 @@ export function createGatewayServer(config: GatewayConfig): FastifyInstance {
               currentAbortController = abortController;
 
               try {
+                // LLM 配置在每次请求开始前动态读取，使 settings.json 更新无需重启 Gateway。
+                const llmConfig = loadLlmConfig();
                 const result = await streamLlm({
-                  config: config.llm,
+                  config: llmConfig,
                   userMessage: text,
                   signal: abortController.signal,
                   onDelta: (delta) => {
@@ -169,12 +171,14 @@ export function createGatewayServer(config: GatewayConfig): FastifyInstance {
                 }
               } catch (error) {
                 if (!abortController.signal.aborted) {
+                  const detail =
+                    error instanceof Error ? { name: error.name, message: error.message } : error;
+                  app.log.error({ err: error, detail }, "LLM 流式调用失败");
                   sendError({
                     code: "internal_error",
                     message: "处理 text.user 失败",
                     retryable: true,
-                    detail:
-                      error instanceof Error ? { name: error.name, message: error.message } : error
+                    detail
                   });
                 }
               } finally {

@@ -180,8 +180,8 @@ function validateSettings(settings: LuminaSettings): string | null {
     return "API Key 不能为空";
   }
 
-  if (maxTokens < 0) {
-    return "Max Tokens 不能为负数";
+  if (!Number.isInteger(maxTokens) || maxTokens < 0) {
+    return "Max Tokens 必须为非负整数";
   }
 
   return null;

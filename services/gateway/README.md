@@ -12,6 +12,7 @@ Gateway 从两个来源读取配置（优先级从高到低）：
 ### LLM 配置
 
 首次使用前，请先启动桌面端（`npm run dev:desktop`），按 `Cmd+,` 打开设置面板配置 LLM 提供商和 API Key。
+设置保存后，Gateway 会在下一条 `text.user` 请求开始前重新读取最新的 LLM 配置，无需重启进程。
 
 如需通过环境变量覆盖（CI/部署场景）：
 

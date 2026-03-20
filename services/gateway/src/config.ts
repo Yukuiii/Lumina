@@ -85,12 +85,12 @@ function loadSettingsFile(): SettingsFile {
 }
 
 /**
- * 从 settings.json + 环境变量加载 Gateway 配置。
+ * 从 settings.json + 环境变量加载 LLM 配置。
  *
  * 优先级：环境变量 > settings.json > 内置默认值。
- * 必需字段（provider, apiKey）缺失时 throw，阻止启动。
+ * 必需字段（provider, apiKey）缺失时 throw。
  */
-export function loadConfig(): GatewayConfig {
+export function loadLlmConfig(): LlmConfig {
   const settings = loadSettingsFile();
   const llmSettings = settings.llm ?? {};
 
@@ -130,6 +130,17 @@ export function loadConfig(): GatewayConfig {
     systemPrompt: process.env.LLM_SYSTEM_PROMPT ?? (llmSettings.systemPrompt || DEFAULT_SYSTEM_PROMPT),
     maxTokens: Number(process.env.LLM_MAX_TOKENS ?? llmSettings.maxTokens ?? 0)
   };
+
+  return llm;
+}
+
+/**
+ * 从 settings.json + 环境变量加载 Gateway 配置。
+ *
+ * 启动时固定 port/host/logLevel；LLM 配置可在运行时按请求重新读取。
+ */
+export function loadConfig(): GatewayConfig {
+  const llm = loadLlmConfig();
 
   return {
     port: Number(process.env.GATEWAY_PORT ?? process.env.PORT ?? "8787"),

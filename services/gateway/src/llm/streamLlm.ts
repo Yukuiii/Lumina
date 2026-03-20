@@ -142,6 +142,7 @@ export async function fetchWithTimeout(
   signal.addEventListener("abort", onAbort, { once: true });
 
   try {
+    console.log(`[LLM] ${init.method ?? "GET"} ${url}`);
     const response = await fetch(url, {
       ...init,
       signal: timeoutController.signal
