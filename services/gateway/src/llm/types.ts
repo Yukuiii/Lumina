@@ -12,6 +12,8 @@ export type LlmConfig = {
   baseUrl: string;
   model: string;
   systemPrompt: string;
+  /** 最大输出 token 数。为 0 时使用 provider 默认值。 */
+  maxTokens: number;
 };
 
 /**

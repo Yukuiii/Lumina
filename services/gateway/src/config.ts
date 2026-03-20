@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+import { getLuminaSettingsFilePath } from "./settingsPath";
 import type { LlmProvider, LlmConfig } from "./llm/types";
 
 const DEFAULT_SYSTEM_PROMPT = `你是 Lumina，一个住在宝宝桌面上的小精灵 ✨
@@ -34,6 +36,25 @@ const VALID_PROVIDERS: ReadonlySet<string> = new Set<LlmProvider>([
 ]);
 
 /**
+ * settings.json 中 LLM 分组的结构。
+ */
+type SettingsLlm = {
+  provider?: string;
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+  systemPrompt?: string;
+  maxTokens?: number;
+};
+
+/**
+ * settings.json 顶层结构。
+ */
+type SettingsFile = {
+  llm?: SettingsLlm;
+};
+
+/**
  * Gateway 运行时配置。
  */
 export type GatewayConfig = {
@@ -44,15 +65,43 @@ export type GatewayConfig = {
 };
 
 /**
- * 从环境变量加载 Gateway 配置。
+ * 尝试从 settings.json 读取配置。
  *
- * 必需变量缺失时直接 throw，阻止 Gateway 启动。
+ * 文件不存在或解析失败时返回空对象。
+ */
+function loadSettingsFile(): SettingsFile {
+  const filePath = getLuminaSettingsFilePath();
+
+  if (!existsSync(filePath)) {
+    return {};
+  }
+
+  try {
+    const raw = readFileSync(filePath, "utf8");
+    return JSON.parse(raw) as SettingsFile;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * 从 settings.json + 环境变量加载 Gateway 配置。
+ *
+ * 优先级：环境变量 > settings.json > 内置默认值。
+ * 必需字段（provider, apiKey）缺失时 throw，阻止启动。
  */
 export function loadConfig(): GatewayConfig {
-  const provider = process.env.LLM_PROVIDER;
+  const settings = loadSettingsFile();
+  const llmSettings = settings.llm ?? {};
+
+  // provider: env > settings > undefined
+  const provider = process.env.LLM_PROVIDER ?? llmSettings.provider;
 
   if (!provider) {
-    throw new Error("LLM_PROVIDER 环境变量未配置（可选值：openai / openai-responses / claude / gemini）");
+    throw new Error(
+      "LLM 提供商未配置。请先在桌面端设置面板配置 LLM provider 和 API Key（Cmd+, 或系统托盘 → 设置），" +
+      "或通过环境变量 LLM_PROVIDER 设置（可选值：openai / openai-responses / claude / gemini）"
+    );
   }
 
   if (!VALID_PROVIDERS.has(provider)) {
@@ -61,10 +110,14 @@ export function loadConfig(): GatewayConfig {
     );
   }
 
-  const apiKey = process.env.LLM_API_KEY;
+  // apiKey: env > settings > undefined
+  const apiKey = process.env.LLM_API_KEY ?? llmSettings.apiKey;
 
   if (!apiKey) {
-    throw new Error("LLM_API_KEY 环境变量未配置");
+    throw new Error(
+      "API Key 未配置。请先在桌面端设置面板配置 API Key（Cmd+, 或系统托盘 → 设置），" +
+      "或通过环境变量 LLM_API_KEY 设置"
+    );
   }
 
   const validProvider = provider as LlmProvider;
@@ -72,9 +125,10 @@ export function loadConfig(): GatewayConfig {
   const llm: LlmConfig = {
     provider: validProvider,
     apiKey,
-    baseUrl: process.env.LLM_BASE_URL ?? PROVIDER_DEFAULT_BASE_URL[validProvider],
-    model: process.env.LLM_MODEL ?? PROVIDER_DEFAULT_MODEL[validProvider],
-    systemPrompt: process.env.LLM_SYSTEM_PROMPT ?? DEFAULT_SYSTEM_PROMPT
+    baseUrl: process.env.LLM_BASE_URL ?? (llmSettings.baseUrl || PROVIDER_DEFAULT_BASE_URL[validProvider]),
+    model: process.env.LLM_MODEL ?? (llmSettings.model || PROVIDER_DEFAULT_MODEL[validProvider]),
+    systemPrompt: process.env.LLM_SYSTEM_PROMPT ?? (llmSettings.systemPrompt || DEFAULT_SYSTEM_PROMPT),
+    maxTokens: Number(process.env.LLM_MAX_TOKENS ?? llmSettings.maxTokens ?? 0)
   };
 
   return {

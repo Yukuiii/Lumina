@@ -29,7 +29,7 @@ export async function streamClaude(options: LlmStreamOptions): Promise<LlmStream
         model: config.model,
         system: config.systemPrompt,
         messages: [{ role: "user", content: userMessage }],
-        max_tokens: 1024,
+        max_tokens: config.maxTokens > 0 ? config.maxTokens : 1024,
         stream: true
       })
     },

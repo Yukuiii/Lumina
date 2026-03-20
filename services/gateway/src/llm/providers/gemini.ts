@@ -35,7 +35,8 @@ export async function streamGemini(options: LlmStreamOptions): Promise<LlmStream
             role: "user",
             parts: [{ text: userMessage }]
           }
-        ]
+        ],
+        ...(config.maxTokens > 0 ? { generationConfig: { maxOutputTokens: config.maxTokens } } : {})
       })
     },
     signal

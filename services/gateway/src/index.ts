@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { loadConfig } from "./config";
 import { createGatewayServer } from "./server";
 

@@ -337,3 +337,208 @@ body {
   75% { opacity: 1; }
   100% { opacity: 0; }
 }
+
+/* ── 设置面板 ── */
+
+@keyframes settings-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg);
+  -webkit-app-region: no-drag;
+}
+
+.settings-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-lg);
+  overflow: hidden;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.settings-title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.settings-close-btn:hover {
+  color: var(--text-primary);
+  background: var(--control-bg-hover);
+}
+
+.settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.settings-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.settings-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.settings-input,
+.settings-select,
+.settings-textarea {
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  background: var(--control-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  outline: none;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.settings-input:focus,
+.settings-select:focus,
+.settings-textarea:focus {
+  border-color: var(--panel-border-light);
+  background: var(--control-bg-hover);
+}
+
+.settings-input::placeholder,
+.settings-textarea::placeholder {
+  color: var(--text-placeholder);
+}
+
+.settings-select {
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.settings-textarea {
+  resize: vertical;
+  min-height: 56px;
+  line-height: 1.4;
+}
+
+/* API Key 显示态 */
+.settings-key-display {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.settings-key-mask {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+
+.settings-key-btn {
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  background: var(--control-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.settings-key-btn:hover {
+  background: var(--control-bg-hover);
+  color: var(--text-primary);
+}
+
+.settings-key-btn-danger:hover {
+  color: var(--status-failed);
+}
+
+/* Footer */
+.settings-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--panel-border);
+}
+
+.settings-save-btn {
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--control-bg);
+  border: 1px solid var(--panel-border-light);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-lg);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.settings-save-btn:hover:not(:disabled) {
+  background: var(--control-bg-hover);
+}
+
+.settings-save-btn:disabled {
+  opacity: var(--control-disabled-opacity);
+  cursor: default;
+}
+
+.settings-toast {
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.settings-toast-success {
+  color: var(--status-connected);
+}
+
+.settings-toast-error {
+  color: var(--status-failed);
+}

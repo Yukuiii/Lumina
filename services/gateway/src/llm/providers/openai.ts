@@ -30,7 +30,8 @@ export async function streamOpenAi(options: LlmStreamOptions): Promise<LlmStream
           { role: "system", content: config.systemPrompt },
           { role: "user", content: userMessage }
         ],
-        stream: true
+        stream: true,
+        ...(config.maxTokens > 0 ? { max_tokens: config.maxTokens } : {})
       })
     },
     signal

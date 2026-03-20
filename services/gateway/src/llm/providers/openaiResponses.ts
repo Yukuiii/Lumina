@@ -28,7 +28,8 @@ export async function streamOpenAiResponses(options: LlmStreamOptions): Promise<
         model: config.model,
         instructions: config.systemPrompt,
         input: userMessage,
-        stream: true
+        stream: true,
+        ...(config.maxTokens > 0 ? { max_output_tokens: config.maxTokens } : {})
       })
     },
     signal

@@ -67,7 +67,7 @@ function getInputMode(status: ConnectionStatus): InputMode {
 /**
  * 桌宠渲染进程 UI。
  *
- * 负责编排 Gateway 连接、输入框可见性、气泡展示和全局快捷键。
+ * 负责编排 Gateway 连接、输入框可见性、气泡展示、设置面板和全局快捷键。
  * Live2D 渲染委托给 `Live2DStage`。
  */
 export function App(): React.JSX.Element {
@@ -94,8 +94,17 @@ export function App(): React.JSX.Element {
   const showBubble = !!streamingText && !bubbleDismissed;
 
   // 全局 Enter 快捷键（窗口聚焦时）→ 弹出输入框。
+  // 全局 Cmd+, / Ctrl+, → 打开设置子窗口。
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
+      // Cmd+, / Ctrl+, → 设置子窗口
+      if (event.key === "," && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        void window.lumina.openSettings();
+        return;
+      }
+
+      // Enter → 输入框
       if (event.key === "Enter" && !showInput) {
         event.preventDefault();
         setShowInput(true);

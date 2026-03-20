@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer } from "electron";
 
 const LOCAL_ASSET_SCHEME = "lumina-model";
 const WINDOW_DRAG_CHANNEL = "lumina:window-drag";
+const SETTINGS_GET_CHANNEL = "lumina:get-settings";
+const SETTINGS_SAVE_CHANNEL = "lumina:save-settings";
+const SETTINGS_OPEN_CHANNEL = "lumina:open-settings";
 
 /**
  * 构造渲染进程可访问的本地资源 URL。
@@ -17,7 +20,7 @@ function createAssetUrl(scope: "model" | "runtime", relativePath: string): strin
 }
 
 /**
- * 向渲染进程暴露最小只读能力（避免直接开启 NodeIntegration）。
+ * 向渲染进程暴露最小受控能力（避免直接开启 NodeIntegration）。
  */
 contextBridge.exposeInMainWorld("lumina", {
   /**
@@ -54,5 +57,26 @@ contextBridge.exposeInMainWorld("lumina", {
     }
 
     ipcRenderer.send(WINDOW_DRAG_CHANNEL, { deltaX, deltaY });
+  },
+
+  /**
+   * 获取当前持久化的设置（API key 脱敏）。
+   */
+  getSettings(): Promise<unknown> {
+    return ipcRenderer.invoke(SETTINGS_GET_CHANNEL);
+  },
+
+  /**
+   * 保存设置到本地文件。
+   */
+  saveSettings(payload: unknown): Promise<unknown> {
+    return ipcRenderer.invoke(SETTINGS_SAVE_CHANNEL, payload);
+  },
+
+  /**
+   * 打开设置子窗口（由 main process 管理窗口生命周期）。
+   */
+  openSettings(): Promise<void> {
+    return ipcRenderer.invoke(SETTINGS_OPEN_CHANNEL);
   }
 });
