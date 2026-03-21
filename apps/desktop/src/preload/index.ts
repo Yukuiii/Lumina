@@ -5,6 +5,7 @@ const WINDOW_DRAG_CHANNEL = "lumina:window-drag";
 const SETTINGS_GET_CHANNEL = "lumina:get-settings";
 const SETTINGS_SAVE_CHANNEL = "lumina:save-settings";
 const SETTINGS_OPEN_CHANNEL = "lumina:open-settings";
+const MIC_PERMISSION_CHANNEL = "lumina:request-mic-permission";
 
 /**
  * 构造渲染进程可访问的本地资源 URL。
@@ -78,5 +79,12 @@ contextBridge.exposeInMainWorld("lumina", {
    */
   openSettings(): Promise<void> {
     return ipcRenderer.invoke(SETTINGS_OPEN_CHANNEL);
+  },
+
+  /**
+   * 请求 macOS 麦克风权限（通过主进程 systemPreferences）。
+   */
+  requestMicPermission(): Promise<{ status: "granted" | "denied" }> {
+    return ipcRenderer.invoke(MIC_PERMISSION_CHANNEL) as Promise<{ status: "granted" | "denied" }>;
   }
 });

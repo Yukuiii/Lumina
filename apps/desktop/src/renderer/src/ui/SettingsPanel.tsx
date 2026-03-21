@@ -11,6 +11,16 @@ const PROVIDER_OPTIONS = [
   { value: "openrouter", label: "OpenRouter" }
 ] as const;
 
+const ASR_PROVIDER_OPTIONS = [
+  { value: "web-speech-api", label: "Web Speech API（浏览器内置）" }
+] as const;
+
+const ASR_LANG_OPTIONS = [
+  { value: "zh-CN", label: "中文" },
+  { value: "en-US", label: "English" },
+  { value: "ja-JP", label: "日本語" }
+] as const;
+
 const PROVIDER_DEFAULT_MODEL: Record<string, string> = {
   openai: "gpt-4.1-mini",
   "openai-responses": "gpt-4.1",
@@ -57,6 +67,10 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
   const [baseUrl, setBaseUrl] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [maxTokens, setMaxTokens] = useState(0);
+
+  // ── ASR 表单状态 ──
+  const [asrProvider, setAsrProvider] = useState("web-speech-api");
+  const [asrLang, setAsrLang] = useState("zh-CN");
 
   // ── API key 状态 ──
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -112,6 +126,8 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
         setSystemPrompt(settings.llm.systemPrompt);
         setMaxTokens(settings.llm.maxTokens);
         setApiKeyMode(settings.llm.hasApiKey ? "display" : "edit");
+        setAsrProvider(settings.asr.provider || "web-speech-api");
+        setAsrLang(settings.asr.lang || "zh-CN");
       } catch (error) {
         if (cancelled) {
           return;
@@ -175,6 +191,10 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
           baseUrl,
           systemPrompt,
           maxTokens
+        },
+        asr: {
+          provider: asrProvider,
+          lang: asrLang
         }
       });
 
@@ -190,7 +210,7 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
     } finally {
       setSaving(false);
     }
-  }, [provider, apiKeyMode, apiKeyInput, apiKeyCleared, model, baseUrl, systemPrompt, maxTokens, onClose, showToast]);
+  }, [provider, apiKeyMode, apiKeyInput, apiKeyCleared, model, baseUrl, systemPrompt, maxTokens, asrProvider, asrLang, onClose, showToast]);
 
   // ── API Key 操作 ──
   const handleEditKey = useCallback(() => {
@@ -332,6 +352,41 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
               type="number"
               value={maxTokens || ""}
             />
+          </label>
+
+          {/* ── ASR 配置 ── */}
+          <div className="settings-section-divider" />
+
+          {/* ASR Provider */}
+          <label className="settings-label">
+            语音识别（ASR）提供商
+            <select
+              className="settings-select"
+              onChange={(e) => setAsrProvider(e.target.value)}
+              value={asrProvider}
+            >
+              {ASR_PROVIDER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/* ASR Language */}
+          <label className="settings-label">
+            识别语言
+            <select
+              className="settings-select"
+              onChange={(e) => setAsrLang(e.target.value)}
+              value={asrLang}
+            >
+              {ASR_LANG_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
 

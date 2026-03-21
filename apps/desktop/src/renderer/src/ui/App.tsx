@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useGatewaySocket } from "../hooks/useGatewaySocket";
 import type { ConnectionStatus } from "../hooks/useGatewaySocket";
+import { useAsr } from "../hooks/useAsr";
 import { Live2DStage } from "../live2d/Live2DStage";
 import type { StageInteractionEvent } from "../live2d/Live2DStage";
 import { ChatBubble } from "./ChatBubble";
@@ -73,6 +74,13 @@ function getInputMode(status: ConnectionStatus): InputMode {
 export function App(): React.JSX.Element {
   const { status, streamingText, errorText, isStreaming, sendTextMessage, retry } =
     useGatewaySocket();
+
+  const { asrStatus, partialTranscript, isAsrSupported, startListening, stopListening } = useAsr({
+    onFinalTranscript: (text) => {
+      sendTextMessage(text);
+    }
+  });
+
   const [showInput, setShowInput] = useState(false);
   const [showHoverHint, setShowHoverHint] = useState(false);
   const hoverHintShownRef = useRef(false);
@@ -217,6 +225,11 @@ export function App(): React.JSX.Element {
             onRetry={retry}
             onSend={handleSend}
             placeholder={getInputPlaceholder(status)}
+            isAsrSupported={isAsrSupported}
+            asrStatus={asrStatus}
+            partialTranscript={partialTranscript}
+            onStartListening={startListening}
+            onStopListening={stopListening}
           />
         </div>
       ) : null}

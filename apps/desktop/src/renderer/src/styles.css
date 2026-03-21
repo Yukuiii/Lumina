@@ -254,6 +254,51 @@ body {
   stroke-linejoin: round;
 }
 
+.chat-input-send:disabled {
+  opacity: var(--control-disabled-opacity);
+  cursor: default;
+}
+
+/* ── 麦克风按钮 ── */
+
+.chat-input-mic {
+  flex-shrink: 0;
+  width: var(--send-btn-size);
+  height: var(--send-btn-size);
+  border: none;
+  border-radius: 50%;
+  background: var(--control-bg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast);
+  padding: 0;
+}
+
+.chat-input-mic:hover {
+  background: var(--control-bg-hover);
+}
+
+.chat-input-mic svg {
+  width: var(--send-icon-size);
+  height: var(--send-icon-size);
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chat-input-mic.is-listening {
+  background: var(--status-failed);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.chat-input-mic.is-listening svg {
+  stroke: var(--text-primary);
+}
+
 /* ── 连接状态指示器 ── */
 
 .connection-dot {
@@ -492,6 +537,12 @@ body {
   resize: vertical;
   min-height: 56px;
   line-height: 1.4;
+}
+
+.settings-section-divider {
+  height: 1px;
+  background: var(--panel-border);
+  margin: var(--space-sm) 0;
 }
 
 /* API Key 显示态 */

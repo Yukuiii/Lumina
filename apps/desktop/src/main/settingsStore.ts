@@ -14,6 +14,10 @@ export type LuminaSettings = {
     systemPrompt: string;
     maxTokens: number;
   };
+  asr: {
+    provider: string;
+    lang: string;
+  };
 };
 
 /** getSettings() 返回给 renderer 的脱敏版本。 */
@@ -25,6 +29,10 @@ export type LuminaSettingsPublic = {
     baseUrl: string;
     systemPrompt: string;
     maxTokens: number;
+  };
+  asr: {
+    provider: string;
+    lang: string;
   };
 };
 
@@ -38,11 +46,16 @@ export type LuminaSettingsSavePayload = {
     systemPrompt: string;
     maxTokens: number;
   };
+  asr?: {
+    provider?: string;
+    lang?: string;
+  };
 };
 
 // ─── 有效值常量 ──────────────────────────────────────────────────
 
 const VALID_PROVIDERS = new Set(["openai", "openai-responses", "claude", "gemini"]);
+const VALID_ASR_PROVIDERS = new Set(["web-speech-api"]);
 
 // ─── 默认值 ──────────────────────────────────────────────────────
 
@@ -55,6 +68,10 @@ function createDefaultSettings(): LuminaSettings {
       baseUrl: "",
       systemPrompt: "",
       maxTokens: 0
+    },
+    asr: {
+      provider: "web-speech-api",
+      lang: "zh-CN"
     }
   };
 }
@@ -87,6 +104,10 @@ export function readSettings(): LuminaSettings {
         systemPrompt:
           typeof parsed.llm?.systemPrompt === "string" ? parsed.llm.systemPrompt : defaults.llm.systemPrompt,
         maxTokens: typeof parsed.llm?.maxTokens === "number" ? parsed.llm.maxTokens : defaults.llm.maxTokens
+      },
+      asr: {
+        provider: typeof parsed.asr?.provider === "string" ? parsed.asr.provider : defaults.asr.provider,
+        lang: typeof parsed.asr?.lang === "string" ? parsed.asr.lang : defaults.asr.lang
       }
     };
   } catch {
@@ -106,6 +127,10 @@ export function toPublicSettings(settings: LuminaSettings): LuminaSettingsPublic
       baseUrl: settings.llm.baseUrl,
       systemPrompt: settings.llm.systemPrompt,
       maxTokens: settings.llm.maxTokens
+    },
+    asr: {
+      provider: settings.asr.provider,
+      lang: settings.asr.lang
     }
   };
 }
@@ -131,6 +156,10 @@ export function writeSettings(payload: LuminaSettingsSavePayload): { ok: boolean
       baseUrl: payload.llm.baseUrl.trim(),
       systemPrompt: payload.llm.systemPrompt.trim(),
       maxTokens: payload.llm.maxTokens
+    },
+    asr: {
+      provider: payload.asr?.provider ?? old.asr.provider,
+      lang: payload.asr?.lang ?? old.asr.lang
     }
   };
 
@@ -182,6 +211,11 @@ function validateSettings(settings: LuminaSettings): string | null {
 
   if (!Number.isInteger(maxTokens) || maxTokens < 0) {
     return "Max Tokens 必须为非负整数";
+  }
+
+  // ASR 校验
+  if (settings.asr.provider && !VALID_ASR_PROVIDERS.has(settings.asr.provider)) {
+    return `无效的 ASR 提供商：${settings.asr.provider}`;
   }
 
   return null;

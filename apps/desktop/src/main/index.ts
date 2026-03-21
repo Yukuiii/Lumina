@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { app, BrowserWindow, ipcMain, Menu, net, nativeImage, protocol, Tray } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, net, nativeImage, protocol, systemPreferences, Tray } from "electron";
 import { readSettings, toPublicSettings, writeSettings } from "./settingsStore";
 import type { LuminaSettingsSavePayload } from "./settingsStore";
 
@@ -12,6 +12,7 @@ const WINDOW_DRAG_CHANNEL = "lumina:window-drag";
 const SETTINGS_GET_CHANNEL = "lumina:get-settings";
 const SETTINGS_SAVE_CHANNEL = "lumina:save-settings";
 const SETTINGS_OPEN_CHANNEL = "lumina:open-settings";
+const MIC_PERMISSION_CHANNEL = "lumina:request-mic-permission";
 const MAIN_WINDOW_WIDTH = 500;
 const MAIN_WINDOW_HEIGHT = 500;
 const SETTINGS_WINDOW_WIDTH = 480;
@@ -148,6 +149,22 @@ function registerSettingsIpc(): void {
   ipcMain.handle(SETTINGS_OPEN_CHANNEL, () => {
     openSettingsWindow();
   });
+
+  ipcMain.handle(MIC_PERMISSION_CHANNEL, async () => {
+    if (process.platform !== "darwin") {
+      return { status: "granted" as const };
+    }
+    const status = systemPreferences.getMediaAccessStatus("microphone");
+    if (status === "granted") {
+      return { status: "granted" as const };
+    }
+    // "not-determined" 时弹出系统授权弹窗；"denied"/"restricted" 需要用户手动去系统设置。
+    if (status === "not-determined") {
+      const granted = await systemPreferences.askForMediaAccess("microphone");
+      return { status: granted ? "granted" as const : "denied" as const };
+    }
+    return { status: "denied" as const };
+  });
 }
 
 /**
@@ -175,6 +192,14 @@ function createMainWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false
     }
+  });
+
+  // 允许渲染进程请求麦克风权限（ASR 语音识别需要）。
+  win.webContents.session.setPermissionRequestHandler((_wc, permission, callback) => {
+    callback(true);
+  });
+  win.webContents.session.setPermissionCheckHandler((_wc, _permission) => {
+    return true;
   });
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -271,7 +296,12 @@ function createTray(): void {
   tray.setToolTip("Lumina");
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // macOS: 请求系统级麦克风权限（ASR 需要），已授权时立即返回 true。
+  if (process.platform === "darwin") {
+    await systemPreferences.askForMediaAccess("microphone");
+  }
+
   registerLocalAssetProtocol();
   registerWindowDragEvents();
   registerSettingsIpc();
