@@ -2,9 +2,9 @@
 
 **住在你桌面上的 AI 小精灵。**
 
-*本地 Live2D 渲染 + 云端流式语音对话，低延迟、可打断、可扩展。*
+_本地 Live2D 渲染 + 云端流式语音对话，低延迟、可打断、可扩展。_
 
-Version TypeScript Electron Status
+![Version](https://img.shields.io/badge/version-0.1.0-green.svg) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg) ![Electron](https://img.shields.io/badge/Electron-41-47848F.svg) ![Status](https://img.shields.io/badge/status-MVP-orange.svg)
 
 ## 📖 简介
 
@@ -15,11 +15,11 @@ Version TypeScript Electron Status
 
 **Lumina** 想解决的就是这两件事——让 AI 从浏览器里搬出来，给她一张脸、一个身体、一个住在你桌面上的家。
 
-她有自己的 Live2D 形象，会在屏幕角落安静地待着。你跟她说话，她会眨眼、会动、会开口回应你。你不理她的时候，她也不会弹窗催你续费——她只是安静地待在那里，等你想找她聊天。
+她有自己的 Live2D 形象，会在屏幕角落安静地待着。你跟她说话，她会眨眼、会动、会开口回应你。你不理她的时候，她也不会消失——她只是安静地待在那里，等你找她聊天。
 
 不是冷冰冰的对话框，不是千篇一律的聊天界面。**是一个有形象、有声音、有温度的小精灵，就住在你的桌面上。**
 
-> "以前跟 AI 聊天，感觉在跟客服对话。现在她蹲在我的任务栏旁边冲我眨眼，我感觉她比我更早到工位。" —— *某个被桌宠盯着写代码的匿名开发者*
+> "以前跟 AI 聊天，感觉在跟客服对话。现在她蹲在我的任务栏旁边冲我眨眼，我感觉她比我更早到工位。" —— _某个被桌宠盯着写代码的匿名开发者_
 
 **核心理念：** 协议稳定优先，厂商差异全部在云端消化，桌面端只管长得好看。想换 LLM？改个配置就行。想接新的 TTS？写个 Adapter 就好。想换个形象？丢个 Live2D 模型进去就完事了。
 
@@ -111,16 +111,14 @@ LLM_PROVIDER=openai LLM_API_KEY=sk-xxx npm run dev:gateway
 
 ## 🛠️ 技术栈
 
-
-| 层级   | 技术                             |
-| ---- | ------------------------------ |
+| 层级     | 技术                           |
+| -------- | ------------------------------ |
 | 桌面框架 | Electron 41 + electron-vite 5  |
-| 前端   | React 19 + Vite 7              |
+| 前端     | React 19 + Vite 7              |
 | 渲染引擎 | PixiJS 8 + pixi-live2d-display |
-| 网关   | Fastify 5 + @fastify/websocket |
+| 网关     | Fastify 5 + @fastify/websocket |
 | 协议校验 | Zod 3.24                       |
-| 语言   | TypeScript 5.6（strict 模式）      |
-
+| 语言     | TypeScript 5.6（strict 模式）  |
 
 ## 🔮 路线图
 
