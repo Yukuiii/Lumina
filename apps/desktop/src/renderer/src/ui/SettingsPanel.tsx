@@ -7,21 +7,24 @@ const PROVIDER_OPTIONS = [
   { value: "openai", label: "OpenAI (Chat Completions)" },
   { value: "openai-responses", label: "OpenAI (Responses)" },
   { value: "claude", label: "Claude" },
-  { value: "gemini", label: "Gemini" }
+  { value: "gemini", label: "Gemini" },
+  { value: "openrouter", label: "OpenRouter" }
 ] as const;
 
 const PROVIDER_DEFAULT_MODEL: Record<string, string> = {
   openai: "gpt-4.1-mini",
   "openai-responses": "gpt-4.1",
   claude: "claude-sonnet-4-20250514",
-  gemini: "gemini-2.5-flash"
+  gemini: "gemini-2.5-flash",
+  openrouter: "openai/gpt-4.1-mini"
 };
 
 const PROVIDER_DEFAULT_BASE_URL: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   "openai-responses": "https://api.openai.com/v1",
   claude: "https://api.anthropic.com/v1",
-  gemini: "https://generativelanguage.googleapis.com/v1beta"
+  gemini: "https://generativelanguage.googleapis.com/v1beta",
+  openrouter: "https://openrouter.ai/api/v1"
 };
 
 // ─── Types ───────────────────────────────────────────────────────

@@ -11,7 +11,8 @@ const PROVIDER_STREAM_FN: Record<string, LlmStreamFunction> = {
   openai: streamOpenAi,
   "openai-responses": streamOpenAiResponses,
   claude: streamClaude,
-  gemini: streamGemini
+  gemini: streamGemini,
+  openrouter: streamOpenAi
 };
 
 /**

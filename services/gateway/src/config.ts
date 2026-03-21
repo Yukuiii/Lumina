@@ -15,7 +15,8 @@ const PROVIDER_DEFAULT_BASE_URL: Record<LlmProvider, string> = {
   openai: "https://api.openai.com/v1",
   "openai-responses": "https://api.openai.com/v1",
   claude: "https://api.anthropic.com/v1",
-  gemini: "https://generativelanguage.googleapis.com/v1beta"
+  gemini: "https://generativelanguage.googleapis.com/v1beta",
+  openrouter: "https://openrouter.ai/api/v1"
 };
 
 /**
@@ -25,14 +26,16 @@ const PROVIDER_DEFAULT_MODEL: Record<LlmProvider, string> = {
   openai: "gpt-4.1-mini",
   "openai-responses": "gpt-4.1",
   claude: "claude-sonnet-4-20250514",
-  gemini: "gemini-2.5-flash"
+  gemini: "gemini-2.5-flash",
+  openrouter: "openai/gpt-4.1-mini"
 };
 
 const VALID_PROVIDERS: ReadonlySet<string> = new Set<LlmProvider>([
   "openai",
   "openai-responses",
   "claude",
-  "gemini"
+  "gemini",
+  "openrouter"
 ]);
 
 /**
@@ -103,7 +106,7 @@ export function loadLlmConfig(): LlmConfig {
   if (!provider) {
     throw new Error(
       "LLM 提供商未配置。请先在桌面端设置面板配置 LLM provider 和 API Key（Cmd+, 或系统托盘 → 设置），" +
-      "或通过环境变量 LLM_PROVIDER 设置（可选值：openai / openai-responses / claude / gemini）"
+      "或通过环境变量 LLM_PROVIDER 设置（可选值：openai / openai-responses / claude / gemini / openrouter）"
     );
   }
 

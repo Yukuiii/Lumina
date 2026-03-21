@@ -1,7 +1,7 @@
 /**
  * 支持的 LLM 提供商。
  */
-export type LlmProvider = "openai" | "openai-responses" | "claude" | "gemini";
+export type LlmProvider = "openai" | "openai-responses" | "claude" | "gemini" | "openrouter";
 
 /**
  * LLM 运行时配置。
