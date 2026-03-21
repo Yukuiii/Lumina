@@ -24,8 +24,10 @@ export function createWebSpeechAdapter(config: AsrConfig, callbacks: AsrCallback
   recognition.lang = config.lang;
 
   let intentionallyStopped = false;
+  let destroyed = false;
 
   recognition.onresult = (event: SpeechRecognitionEvent) => {
+    if (destroyed) return;
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const result = event.results[i];
       callbacks.onResult({
@@ -36,6 +38,7 @@ export function createWebSpeechAdapter(config: AsrConfig, callbacks: AsrCallback
   };
 
   recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+    if (destroyed) return;
     console.warn("[ASR]", event.error);
 
     if (event.error === "aborted" || event.error === "no-speech") {
@@ -47,6 +50,7 @@ export function createWebSpeechAdapter(config: AsrConfig, callbacks: AsrCallback
   };
 
   recognition.onend = () => {
+    if (destroyed) return;
     if (!intentionallyStopped) {
       callbacks.onStatusChange("idle");
     }
@@ -55,21 +59,29 @@ export function createWebSpeechAdapter(config: AsrConfig, callbacks: AsrCallback
 
   return {
     start: () => {
+      if (destroyed) return;
       // 必须同步调用——Chromium 要求 start() 在用户手势上下文中执行。
       intentionallyStopped = false;
       try {
         recognition.start();
-      } catch {
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "InvalidStateError") return;
+        callbacks.onError({ code: "start_failed", message: String(err) });
+        callbacks.onStatusChange("error");
         return;
       }
       callbacks.onStatusChange("listening");
     },
     stop: () => {
+      if (destroyed) return;
       intentionallyStopped = true;
       recognition.stop();
       callbacks.onStatusChange("idle");
     },
     destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      intentionallyStopped = true;
       recognition.abort();
       recognition.onresult = null;
       recognition.onerror = null;
