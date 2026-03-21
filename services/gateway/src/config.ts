@@ -56,12 +56,15 @@ type SettingsFile = {
 
 /**
  * Gateway 运行时配置。
+ *
+ * `llm` 为可选：首次安装时 settings.json 尚不存在，Gateway 仍需正常启动；
+ * LLM 校验延迟到每次请求时由 `loadLlmConfig()` 执行。
  */
 export type GatewayConfig = {
   port: number;
   host: string;
   logLevel: string;
-  llm: LlmConfig;
+  llm?: LlmConfig;
 };
 
 /**
@@ -137,10 +140,17 @@ export function loadLlmConfig(): LlmConfig {
 /**
  * 从 settings.json + 环境变量加载 Gateway 配置。
  *
- * 启动时固定 port/host/logLevel；LLM 配置可在运行时按请求重新读取。
+ * 启动时固定 port/host/logLevel；LLM 配置尝试加载但不强制，
+ * 首次安装时允许无 LLM 配置启动，校验延迟到每次请求。
  */
 export function loadConfig(): GatewayConfig {
-  const llm = loadLlmConfig();
+  let llm: LlmConfig | undefined;
+
+  try {
+    llm = loadLlmConfig();
+  } catch {
+    // 首次安装、settings.json 不存在等场景：启动时跳过，请求时再校验。
+  }
 
   return {
     port: Number(process.env.GATEWAY_PORT ?? process.env.PORT ?? "8787"),
